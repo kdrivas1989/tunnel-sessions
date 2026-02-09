@@ -19,50 +19,169 @@
 
     <script src="app.js?v=5"></script>
     <script>
-        // February 2026 ShredClub sessions from SignUpGenius
+        // February 2026 ShredClub sessions from SignUpGenius with participants
+        // Notes that are names become separate bookings
         const sessionsToImport = [
             // February 4, 2026 (Wednesday)
-            { date: '2026-02-04', time: '19:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
-            { date: '2026-02-04', time: '20:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
-            { date: '2026-02-04', time: '21:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
+            {
+                date: '2026-02-04', time: '19:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
+                bookings: [
+                    { firstName: 'Chris', lastName: 'Mangano', notes: '' },
+                    { firstName: 'Isley', lastName: 'Boyarski', notes: '' },
+                    { firstName: 'Brendan C', lastName: 'Conway', notes: 'Stability Drills' },
+                    { firstName: 'Ed', lastName: 'Laird', notes: '' }
+                ]
+            },
+            {
+                date: '2026-02-04', time: '20:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
+                bookings: [
+                    { firstName: 'Bodhi', lastName: 'Wilkins', notes: '' },
+                    { firstName: 'Nick', lastName: 'Larrabee', notes: '' },
+                    { firstName: 'Dianne', lastName: 'Cucufate', notes: '' }
+                ]
+            },
+            {
+                date: '2026-02-04', time: '21:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
+                bookings: [
+                    { firstName: 'Dmitri', lastName: 'Kazarlyga', notes: '' },
+                    { firstName: 'Vladislav', lastName: 'Shashkin', notes: '' },
+                    { firstName: 'Dianne', lastName: 'Cucufate', notes: '' },
+                    { firstName: 'Ethan', lastName: 'Apter', notes: '' }
+                ]
+            },
 
             // February 11, 2026 (Wednesday)
-            { date: '2026-02-11', time: '19:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
-            { date: '2026-02-11', time: '20:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
-            { date: '2026-02-11', time: '21:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
+            {
+                date: '2026-02-11', time: '19:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
+                bookings: [
+                    { firstName: 'Chris', lastName: 'Mangano', notes: '' },
+                    { firstName: 'Isley', lastName: 'Boyarski', notes: '' },
+                    { firstName: 'Ed', lastName: 'Laird', notes: '' },
+                    { firstName: 'Paul', lastName: 'Dirnd', notes: '' }
+                ]
+            },
+            {
+                date: '2026-02-11', time: '20:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
+                bookings: [
+                    { firstName: 'Side', lastName: 'Caesar', notes: '' },
+                    { firstName: 'Devin', lastName: 'Murray', notes: '2 way VFS' },
+                    { firstName: 'Brendan', lastName: 'Conway', notes: '' },
+                    { firstName: 'Dianne', lastName: 'Cucufate', notes: '' },
+                    { firstName: 'Alyssa', lastName: '', notes: '' }
+                ]
+            },
+            {
+                date: '2026-02-11', time: '21:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
+                bookings: [
+                    { firstName: 'Dianne', lastName: 'Cucufate', notes: '' },
+                    { firstName: 'Alyssa', lastName: '', notes: '' },
+                    { firstName: 'Dmitri', lastName: 'Kazarlyga', notes: '' },
+                    { firstName: 'Vladislav', lastName: 'Shashkin', notes: '' },
+                    { firstName: 'Gabriel', lastName: 'Leonard', notes: '' }
+                ]
+            },
 
             // February 18, 2026 (Wednesday)
-            { date: '2026-02-18', time: '19:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
-            { date: '2026-02-18', time: '20:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
-            { date: '2026-02-18', time: '21:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
+            {
+                date: '2026-02-18', time: '19:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
+                bookings: [
+                    { firstName: 'Chris', lastName: 'Mangano', notes: '' },
+                    { firstName: 'Jon', lastName: 'Mortison', notes: 'Back Fly' },
+                    { firstName: 'Ed', lastName: 'Laird', notes: '' },
+                    { firstName: 'Dianne', lastName: 'Cucufate', notes: '' },
+                    { firstName: 'Alyssa', lastName: '', notes: '' },
+                    { firstName: 'Robbie', lastName: '', notes: '' },
+                    { firstName: 'Erin', lastName: '', notes: '' }
+                ]
+            },
+            {
+                date: '2026-02-18', time: '20:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
+                bookings: [
+                    { firstName: 'Side', lastName: 'Caesar', notes: '' },
+                    { firstName: 'Dianne', lastName: 'Cucufate', notes: '' },
+                    { firstName: 'Alyssa', lastName: '', notes: '' },
+                    { firstName: 'Robbie', lastName: '', notes: '' },
+                    { firstName: 'Erin', lastName: '', notes: '' }
+                ]
+            },
+            {
+                date: '2026-02-18', time: '21:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
+                bookings: []
+            },
 
             // February 25, 2026 (Wednesday)
-            { date: '2026-02-25', time: '19:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
-            { date: '2026-02-25', time: '20:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
-            { date: '2026-02-25', time: '21:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
+            {
+                date: '2026-02-25', time: '19:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
+                bookings: [
+                    { firstName: 'Chris', lastName: 'Mangano', notes: '' },
+                    { firstName: 'Isley', lastName: 'Boyarski', notes: '' },
+                    { firstName: 'Ed', lastName: 'Laird', notes: '' },
+                    { firstName: 'Jon', lastName: 'Mortison', notes: 'Back Fly' }
+                ]
+            },
+            {
+                date: '2026-02-25', time: '20:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
+                bookings: [
+                    { firstName: 'Side', lastName: 'Caesar', notes: '' }
+                ]
+            },
+            {
+                date: '2026-02-25', time: '21:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
+                bookings: []
+            },
         ];
 
         let statusHtml = '<h2>Importing February ShredClub Sessions...</h2><ul>';
-        let created = 0;
-        let skipped = 0;
+        let sessionsCreated = 0;
+        let sessionsSkipped = 0;
+        let bookingsAdded = 0;
 
         sessionsToImport.forEach(sessionData => {
-            const session = createSession(sessionData);
             const dateObj = new Date(sessionData.date + 'T' + sessionData.time);
             const dateStr = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
             const timeStr = dateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-            if (session) {
-                statusHtml += `<li style="color: var(--success-color);">✓ Created: ${sessionData.sessionType} - ${dateStr} @ ${timeStr}</li>`;
-                created++;
+            // Check if session already exists
+            const existingSessions = getSessions();
+            const existing = existingSessions.find(s =>
+                s.date === sessionData.date &&
+                s.time === sessionData.time &&
+                s.sessionType === sessionData.sessionType
+            );
+
+            if (existing) {
+                // Session exists - skip it
+                sessionsSkipped++;
+                statusHtml += `<li style="color: orange;">⚠ Skipped (already exists): ${dateStr} @ ${timeStr} - ${existing.bookings.length} participant(s)</li>`;
             } else {
-                statusHtml += `<li style="color: orange;">⚠ Already exists: ${sessionData.sessionType} - ${dateStr} @ ${timeStr}</li>`;
-                skipped++;
+                // Create new session with expanded capacity for extra people
+                const neededCapacity = Math.max(sessionData.capacity, sessionData.bookings.length);
+                const session = createSession({
+                    sessionType: sessionData.sessionType,
+                    date: sessionData.date,
+                    time: sessionData.time,
+                    duration: sessionData.duration,
+                    capacity: neededCapacity
+                });
+
+                if (session) {
+                    sessionsCreated++;
+                    statusHtml += `<li style="color: var(--success-color);">✓ Created: ${dateStr} @ ${timeStr}</li>`;
+
+                    // Add bookings
+                    if (sessionData.bookings && sessionData.bookings.length > 0) {
+                        sessionData.bookings.forEach(booking => {
+                            addBooking(session.id, booking.firstName, booking.lastName, booking.notes);
+                            bookingsAdded++;
+                        });
+                        statusHtml += `<li style="margin-left: 20px; color: var(--text-secondary);">Added ${sessionData.bookings.length} participant(s): ${sessionData.bookings.map(b => b.firstName + (b.lastName ? ' ' + b.lastName : '')).join(', ')}</li>`;
+                    }
+                }
             }
         });
 
         statusHtml += '</ul>';
-        statusHtml += `<p style="margin-top: 20px; font-size: 1.1rem;"><strong>Summary:</strong> ${created} created, ${skipped} already existed</p>`;
+        statusHtml += `<p style="margin-top: 20px; font-size: 1.1rem;"><strong>Summary:</strong> ${sessionsCreated} sessions created, ${bookingsAdded} participants added, ${sessionsSkipped} skipped (duplicates)</p>`;
         statusHtml += '<p style="margin-top: 20px;"><a href="host.html" class="btn btn-primary">Go to Host Dashboard</a></p>';
         statusHtml += '<p style="margin-top: 10px;"><a href="index.html" class="btn btn-outline">Go to Booking Page</a></p>';
 
