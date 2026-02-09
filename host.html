@@ -158,6 +158,19 @@
                 <div id="hosts-list"></div>
             </section>
 
+            <!-- User Management Section (Admin Only) -->
+            <section id="user-management" class="card hidden">
+                <h2>Manage Users (Admin Only)</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">All registered users who can book sessions.</p>
+                <div id="users-list"></div>
+            </section>
+
+            <!-- Password Reset Requests (Admin Only) -->
+            <section id="reset-requests" class="card hidden">
+                <h2>Password Reset Requests</h2>
+                <div id="reset-requests-list"></div>
+            </section>
+
             <!-- Add Person Modal -->
             <div id="add-person-modal" class="modal hidden">
                 <div class="modal-content">
@@ -345,10 +358,16 @@
             if (role === 'admin' && admin) {
                 document.getElementById('welcome-user').textContent = `Welcome, ${admin.username} (Admin)`;
                 document.getElementById('host-management').classList.remove('hidden');
+                document.getElementById('user-management').classList.remove('hidden');
+                document.getElementById('reset-requests').classList.remove('hidden');
                 loadHosts();
+                loadUsers();
+                loadResetRequests();
             } else {
                 document.getElementById('welcome-user').textContent = `Welcome, Host`;
                 document.getElementById('host-management').classList.add('hidden');
+                document.getElementById('user-management').classList.add('hidden');
+                document.getElementById('reset-requests').classList.add('hidden');
             }
 
             showScreen(dashboardScreen);
@@ -420,6 +439,159 @@
                 errorEl.classList.remove('hidden');
             }
         });
+
+        // Load and display users (admin only)
+        function loadUsers() {
+            const users = getUsers();
+            const container = document.getElementById('users-list');
+
+            if (users.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary);">No users registered yet.</p>';
+                return;
+            }
+
+            let html = '<ul class="bookings-list">';
+            users.forEach(user => {
+                html += `
+                    <li style="flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <strong>${user.firstName} ${user.lastName}</strong><br>
+                            <span style="color: var(--text-secondary); font-size: 0.9rem;">${user.email}</span>
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <button class="btn btn-small btn-edit" onclick="resetUserPassword('${user.id}')">Reset Password</button>
+                            <button class="btn-remove" onclick="removeUser('${user.id}')">Remove</button>
+                        </div>
+                    </li>
+                `;
+            });
+            html += '</ul>';
+            container.innerHTML = html;
+        }
+
+        // Reset user password
+        function resetUserPassword(userId) {
+            const newPassword = prompt('Enter new password for this user (min 6 characters):');
+            if (!newPassword) return;
+
+            if (newPassword.length < 6) {
+                alert('Password must be at least 6 characters');
+                return;
+            }
+
+            const users = getUsers();
+            const userIndex = users.findIndex(u => u.id === userId);
+            if (userIndex === -1) {
+                alert('User not found');
+                return;
+            }
+
+            users[userIndex].passwordHash = hashPassword(newPassword);
+            saveUsers(users);
+            alert('Password reset successfully');
+        }
+
+        // Remove user
+        function removeUser(userId) {
+            if (!confirm('Are you sure you want to remove this user?')) return;
+
+            const users = getUsers();
+            const filtered = users.filter(u => u.id !== userId);
+            saveUsers(filtered);
+            loadUsers();
+        }
+
+        // Load password reset requests
+        function loadResetRequests() {
+            const requests = JSON.parse(localStorage.getItem('tunnelSessionsResetRequests') || '[]');
+            const pendingRequests = requests.filter(r => !r.processed);
+            const container = document.getElementById('reset-requests-list');
+
+            if (pendingRequests.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary);">No pending password reset requests.</p>';
+                return;
+            }
+
+            let html = '<ul class="bookings-list">';
+            pendingRequests.forEach(request => {
+                const requestDate = new Date(request.requestedAt).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit'
+                });
+                html += `
+                    <li style="flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <strong>${request.userName}</strong><br>
+                            <span style="color: var(--text-secondary); font-size: 0.9rem;">${request.email}</span><br>
+                            <span style="color: var(--text-secondary); font-size: 0.8rem;">Requested: ${requestDate}</span>
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <button class="btn btn-small btn-primary" onclick="processResetRequest('${request.id}')">Reset Password</button>
+                            <button class="btn-remove" onclick="dismissResetRequest('${request.id}')">Dismiss</button>
+                        </div>
+                    </li>
+                `;
+            });
+            html += '</ul>';
+            container.innerHTML = html;
+        }
+
+        // Process reset request - reset the user's password
+        function processResetRequest(requestId) {
+            const requests = JSON.parse(localStorage.getItem('tunnelSessionsResetRequests') || '[]');
+            const request = requests.find(r => r.id === requestId);
+
+            if (!request) {
+                alert('Request not found');
+                return;
+            }
+
+            const newPassword = prompt(`Enter new password for ${request.userName} (${request.email}):`);
+            if (!newPassword) return;
+
+            if (newPassword.length < 6) {
+                alert('Password must be at least 6 characters');
+                return;
+            }
+
+            // Find and update user
+            const users = getUsers();
+            const userIndex = users.findIndex(u => u.email.toLowerCase() === request.email.toLowerCase());
+
+            if (userIndex === -1) {
+                alert('User not found');
+                return;
+            }
+
+            users[userIndex].passwordHash = hashPassword(newPassword);
+            saveUsers(users);
+
+            // Mark request as processed
+            request.processed = true;
+            request.processedAt = new Date().toISOString();
+            localStorage.setItem('tunnelSessionsResetRequests', JSON.stringify(requests));
+
+            alert(`Password reset for ${request.userName}. Please inform them their new password is: ${newPassword}`);
+            loadResetRequests();
+        }
+
+        // Dismiss reset request
+        function dismissResetRequest(requestId) {
+            if (!confirm('Dismiss this reset request?')) return;
+
+            const requests = JSON.parse(localStorage.getItem('tunnelSessionsResetRequests') || '[]');
+            const request = requests.find(r => r.id === requestId);
+
+            if (request) {
+                request.processed = true;
+                request.dismissed = true;
+                localStorage.setItem('tunnelSessionsResetRequests', JSON.stringify(requests));
+            }
+
+            loadResetRequests();
+        }
 
         // Settings
         function loadSettings() {

@@ -61,6 +61,7 @@
                         <p id="login-error" class="error-message hidden">Invalid email or password</p>
                         <button type="submit" class="btn btn-primary btn-full">Login</button>
                     </form>
+                    <p class="modal-switch"><a href="#" onclick="openForgotPasswordModal()">Forgot Password?</a></p>
                     <p class="modal-switch">Don't have an account? <a href="#" onclick="switchToRegister()">Sign up</a></p>
                 </div>
             </div>
@@ -148,6 +149,24 @@
                     <h3>Booking Confirmed!</h3>
                     <p id="success-message"></p>
                     <button class="btn btn-primary" onclick="closeSuccessModal()">Done</button>
+                </div>
+            </div>
+
+            <!-- Forgot Password Modal -->
+            <div id="forgot-password-modal" class="modal hidden">
+                <div class="modal-content">
+                    <span class="close-btn">&times;</span>
+                    <h3>Reset Password</h3>
+                    <form id="forgot-password-form">
+                        <div class="form-group">
+                            <label for="forgotEmail">Enter your email address</label>
+                            <input type="email" id="forgotEmail" required placeholder="your@email.com">
+                        </div>
+                        <p id="forgot-error" class="error-message hidden"></p>
+                        <p id="forgot-success" class="success-message hidden"></p>
+                        <button type="submit" class="btn btn-primary btn-full">Send Reset Request</button>
+                    </form>
+                    <p class="modal-switch" style="margin-top: 15px;"><a href="#" onclick="switchToLoginFromForgot()">Back to Login</a></p>
                 </div>
             </div>
         </main>
@@ -647,6 +666,70 @@
         }
 
         document.querySelector('#success-modal .close-btn').addEventListener('click', closeSuccessModal);
+
+        // Forgot Password
+        function openForgotPasswordModal() {
+            document.getElementById('login-modal').classList.add('hidden');
+            document.getElementById('forgot-password-modal').classList.remove('hidden');
+            document.getElementById('forgotEmail').focus();
+        }
+
+        function switchToLoginFromForgot() {
+            document.getElementById('forgot-password-modal').classList.add('hidden');
+            document.getElementById('forgot-password-form').reset();
+            document.getElementById('forgot-error').classList.add('hidden');
+            document.getElementById('forgot-success').classList.add('hidden');
+            openLoginModal();
+        }
+
+        document.querySelector('#forgot-password-modal .close-btn').addEventListener('click', () => {
+            document.getElementById('forgot-password-modal').classList.add('hidden');
+            document.getElementById('forgot-password-form').reset();
+            document.getElementById('forgot-error').classList.add('hidden');
+            document.getElementById('forgot-success').classList.add('hidden');
+        });
+
+        document.getElementById('forgot-password-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('forgotEmail').value.trim();
+            const errorEl = document.getElementById('forgot-error');
+            const successEl = document.getElementById('forgot-success');
+
+            errorEl.classList.add('hidden');
+            successEl.classList.add('hidden');
+
+            // Check if user exists
+            const user = getUserByEmail(email);
+            if (!user) {
+                errorEl.textContent = 'No account found with this email';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            // Store reset request for admin to see
+            const resetRequests = JSON.parse(localStorage.getItem('tunnelSessionsResetRequests') || '[]');
+
+            // Check if already requested
+            const existingRequest = resetRequests.find(r => r.email.toLowerCase() === email.toLowerCase() && !r.processed);
+            if (existingRequest) {
+                successEl.textContent = 'Reset request already submitted. An admin will contact you soon.';
+                successEl.classList.remove('hidden');
+                return;
+            }
+
+            resetRequests.push({
+                id: Date.now().toString(36),
+                email: email.toLowerCase(),
+                userName: `${user.firstName} ${user.lastName}`,
+                requestedAt: new Date().toISOString(),
+                processed: false
+            });
+            localStorage.setItem('tunnelSessionsResetRequests', JSON.stringify(resetRequests));
+
+            successEl.textContent = 'Reset request submitted! An admin will reset your password and contact you.';
+            successEl.classList.remove('hidden');
+            document.getElementById('forgot-password-form').reset();
+        });
 
         // Close modals when clicking outside
         window.addEventListener('click', (e) => {
