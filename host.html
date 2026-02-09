@@ -84,20 +84,13 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="sessionDay">Day of Week</label>
-                            <select id="sessionDay" required>
-                                <option value="">Select a day</option>
-                                <option value="3">Wednesday</option>
-                                <option value="4">Thursday</option>
-                                <option value="5">Friday</option>
-                                <option value="6">Saturday</option>
-                                <option value="0">Sunday</option>
-                            </select>
+                            <label for="sessionDate">Date</label>
+                            <input type="date" id="sessionDate" required>
                         </div>
                         <div class="form-group">
                             <label for="sessionTime">Time</label>
                             <select id="sessionTime" required>
-                                <option value="">Select a day first</option>
+                                <option value="">Select a date first</option>
                             </select>
                         </div>
                     </div>
@@ -279,20 +272,35 @@
             document.getElementById('welcome-user').textContent = `Welcome, ${admin.username}`;
             showScreen(dashboardScreen);
             loadHostSessions();
+
+            // Set minimum date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('sessionDate').min = today;
         }
 
-        // Time picker based on day selection
-        document.getElementById('sessionDay').addEventListener('change', updateTimeOptions);
+        // Time picker based on date selection
+        document.getElementById('sessionDate').addEventListener('change', updateTimeOptions);
 
         function updateTimeOptions() {
-            const daySelect = document.getElementById('sessionDay');
+            const dateInput = document.getElementById('sessionDate');
             const timeSelect = document.getElementById('sessionTime');
-            const day = daySelect.value;
+            const dateValue = dateInput.value;
 
             timeSelect.innerHTML = '';
 
-            if (!day) {
-                timeSelect.innerHTML = '<option value="">Select a day first</option>';
+            if (!dateValue) {
+                timeSelect.innerHTML = '<option value="">Select a date first</option>';
+                return;
+            }
+
+            // Get day of week from selected date (0 = Sunday, 1 = Monday, etc.)
+            const selectedDate = new Date(dateValue + 'T12:00:00');
+            const day = selectedDate.getDay();
+
+            // Check if it's a valid business day (Wed-Sun)
+            // Monday = 1, Tuesday = 2 (closed)
+            if (day === 1 || day === 2) {
+                timeSelect.innerHTML = '<option value="">Closed on Mon/Tue - pick another date</option>';
                 return;
             }
 
@@ -300,7 +308,7 @@
 
             // Wednesday (3), Thursday (4), Friday (5): 2:00 PM - 9:00 PM
             // Saturday (6), Sunday (0): 10:00 AM - 5:30 PM
-            if (day === '3' || day === '4' || day === '5') {
+            if (day === 3 || day === 4 || day === 5) {
                 startHour = 14; // 2:00 PM
                 startMin = 0;
                 endHour = 21;   // 9:00 PM
@@ -428,28 +436,23 @@
             e.preventDefault();
 
             const sessionType = document.getElementById('sessionType').value;
-            const dayOfWeek = parseInt(document.getElementById('sessionDay').value);
+            const selectedDate = document.getElementById('sessionDate').value;
             const time = document.getElementById('sessionTime').value;
             const duration = parseInt(document.getElementById('sessionDuration').value);
             const capacity = parseInt(document.getElementById('sessionCapacity').value);
             const repeatWeeks = parseInt(document.getElementById('repeatWeeks').value);
 
-            // Find the next occurrence of the selected day
-            const today = new Date();
-            let nextDate = new Date(today);
-
-            // Calculate days until the next occurrence
-            const currentDay = today.getDay();
-            let daysUntil = dayOfWeek - currentDay;
-            if (daysUntil <= 0) {
-                daysUntil += 7;
+            if (!time || time.includes('Closed') || time.includes('Select')) {
+                alert('Please select a valid date and time');
+                return;
             }
-            nextDate.setDate(today.getDate() + daysUntil);
 
-            // Create sessions for each week
+            // Create sessions for each week starting from selected date
+            const startDate = new Date(selectedDate + 'T12:00:00');
+
             for (let i = 0; i < repeatWeeks; i++) {
-                const sessionDate = new Date(nextDate);
-                sessionDate.setDate(nextDate.getDate() + (i * 7));
+                const sessionDate = new Date(startDate);
+                sessionDate.setDate(startDate.getDate() + (i * 7));
 
                 const dateStr = sessionDate.toISOString().split('T')[0];
 
@@ -464,7 +467,7 @@
 
             alert(`Created ${repeatWeeks} session(s)!`);
             document.getElementById('create-session-form').reset();
-            document.getElementById('sessionTime').innerHTML = '<option value="">Select a day first</option>';
+            document.getElementById('sessionTime').innerHTML = '<option value="">Select a date first</option>';
             document.getElementById('sessionDuration').value = '60';
             document.getElementById('sessionCapacity').value = '4';
             document.getElementById('repeatWeeks').value = '1';
