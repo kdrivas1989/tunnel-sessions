@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Add Test Data</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Add Test Data</h1>
+        </header>
+        <main>
+            <section class="card">
+                <div id="status"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js?v=4"></script>
+    <script>
+        const today = '2026-02-09';
+
+        // Create test sessions for today
+        const testSessions = [
+            {
+                sessionType: 'ShredClub',
+                date: today,
+                time: '14:00',
+                duration: 60,
+                capacity: 4
+            },
+            {
+                sessionType: 'Rookie Scrambles',
+                date: today,
+                time: '15:30',
+                duration: 60,
+                capacity: 4
+            },
+            {
+                sessionType: 'Advanced Scrambles',
+                date: today,
+                time: '19:00',
+                duration: 60,
+                capacity: 4
+            }
+        ];
+
+        // Test bookings
+        const testPeople = [
+            { firstName: 'John', lastName: 'Smith' },
+            { firstName: 'Sarah', lastName: 'Johnson' },
+            { firstName: 'Mike', lastName: 'Williams' },
+            { firstName: 'Emma', lastName: 'Brown' },
+            { firstName: 'Chris', lastName: 'Davis' },
+            { firstName: 'Lisa', lastName: 'Miller' }
+        ];
+
+        let statusHtml = '<h2>Adding Test Data...</h2><ul>';
+
+        // Create sessions
+        testSessions.forEach(sessionData => {
+            const session = createSession(sessionData);
+            if (session) {
+                statusHtml += `<li>Created: ${sessionData.sessionType} at ${sessionData.time}</li>`;
+
+                // Add 2-3 random bookings to each session
+                const numBookings = 2 + Math.floor(Math.random() * 2);
+                const shuffled = [...testPeople].sort(() => Math.random() - 0.5);
+
+                for (let i = 0; i < numBookings; i++) {
+                    addBooking(session.id, shuffled[i].firstName, shuffled[i].lastName);
+                    statusHtml += `<li style="margin-left: 20px;">Added: ${shuffled[i].firstName} ${shuffled[i].lastName}</li>`;
+                }
+            } else {
+                statusHtml += `<li style="color: orange;">Session already exists: ${sessionData.sessionType} at ${sessionData.time}</li>`;
+            }
+        });
+
+        statusHtml += '</ul>';
+        statusHtml += '<p style="margin-top: 20px;"><a href="auto-text.html" class="btn btn-primary">Go to Auto-Text Page</a></p>';
+        statusHtml += '<p style="margin-top: 10px;"><a href="host.html" class="btn btn-outline">Go to Host Dashboard</a></p>';
+
+        document.getElementById('status').innerHTML = statusHtml;
+    </script>
+</body>
+</html>
