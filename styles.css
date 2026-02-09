@@ -120,6 +120,20 @@ section h2 {
     border-bottom: 1px solid var(--border-color);
 }
 
+/* Session Type Badge */
+.session-type-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
 .day-name {
     font-size: 1.25rem;
     font-weight: 600;

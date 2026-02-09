@@ -99,18 +99,19 @@ function getSessionById(sessionId) {
 }
 
 // Create a new session
-function createSession({ date, time, duration, capacity }) {
+function createSession({ sessionType, date, time, duration, capacity }) {
     const sessions = getSessions();
 
-    // Check if session already exists for this date/time
-    const exists = sessions.some(s => s.date === date && s.time === time);
+    // Check if session already exists for this date/time/type
+    const exists = sessions.some(s => s.date === date && s.time === time && s.sessionType === sessionType);
     if (exists) {
-        console.log('Session already exists for this date/time');
+        console.log('Session already exists for this date/time/type');
         return null;
     }
 
     const newSession = {
         id: generateId(),
+        sessionType,
         date,
         time,
         duration,

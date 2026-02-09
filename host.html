@@ -69,6 +69,15 @@
             <section class="card">
                 <h2>Create New Session</h2>
                 <form id="create-session-form">
+                    <div class="form-group">
+                        <label for="sessionType">Session Type</label>
+                        <select id="sessionType" required>
+                            <option value="">Select a session type</option>
+                            <option value="ShredClub">ShredClub</option>
+                            <option value="Rookie Scrambles">Rookie Scrambles</option>
+                            <option value="Advanced Scrambles">Advanced Scrambles</option>
+                        </select>
+                    </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="sessionDay">Day of Week</label>
@@ -297,6 +306,7 @@
             card.innerHTML = `
                 <div class="host-session-header">
                     <div>
+                        <span class="session-type-badge">${session.sessionType || 'Session'}</span>
                         <h3>${dateStr}</h3>
                         <p>${timeStr} - ${session.duration} min | ${session.bookings.length}/${session.capacity} booked</p>
                     </div>
@@ -318,6 +328,7 @@
         document.getElementById('create-session-form').addEventListener('submit', (e) => {
             e.preventDefault();
 
+            const sessionType = document.getElementById('sessionType').value;
             const dayOfWeek = parseInt(document.getElementById('sessionDay').value);
             const time = document.getElementById('sessionTime').value;
             const duration = parseInt(document.getElementById('sessionDuration').value);
@@ -344,6 +355,7 @@
                 const dateStr = sessionDate.toISOString().split('T')[0];
 
                 createSession({
+                    sessionType: sessionType,
                     date: dateStr,
                     time: time,
                     duration: duration,
@@ -383,6 +395,7 @@
             const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
             document.getElementById('add-session-details').innerHTML = `
+                <p class="session-type-badge">${session.sessionType || 'Session'}</p>
                 <p><strong>${dateStr}</strong></p>
                 <p>${timeStr} - ${session.bookings.length}/${session.capacity} booked</p>
             `;

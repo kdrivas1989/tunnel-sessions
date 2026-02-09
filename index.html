@@ -113,6 +113,7 @@
 
             card.innerHTML = `
                 <div class="session-date">
+                    <span class="session-type-badge">${session.sessionType || 'Session'}</span>
                     <span class="day-name">${dayName}</span>
                     <span class="month-day">${monthDay}</span>
                 </div>
@@ -145,6 +146,7 @@
             const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
             document.getElementById('session-details').innerHTML = `
+                <p class="session-type-badge">${session.sessionType || 'Session'}</p>
                 <p><strong>${dateStr}</strong></p>
                 <p>${timeStr} - ${session.duration} minutes</p>
             `;
