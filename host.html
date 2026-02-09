@@ -14,7 +14,57 @@
             <p class="tagline">Manage Your Sessions</p>
         </header>
 
-        <main class="host-main">
+        <!-- Login Screen -->
+        <main id="login-screen" class="host-main">
+            <section class="card login-card">
+                <h2>Host Login</h2>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="loginUsername">Username</label>
+                        <input type="text" id="loginUsername" required autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" required autocomplete="current-password">
+                    </div>
+                    <p id="login-error" class="error-message hidden">Invalid username or password</p>
+                    <button type="submit" class="btn btn-primary btn-full">Login</button>
+                </form>
+            </section>
+        </main>
+
+        <!-- Setup Screen (First Time) -->
+        <main id="setup-screen" class="host-main hidden">
+            <section class="card login-card">
+                <h2>Create Admin Account</h2>
+                <p class="setup-intro">Set up your host login to manage sessions.</p>
+                <form id="setup-form">
+                    <div class="form-group">
+                        <label for="setupUsername">Username</label>
+                        <input type="text" id="setupUsername" required minlength="3" autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="setupPassword">Password</label>
+                        <input type="password" id="setupPassword" required minlength="6" autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label for="setupPasswordConfirm">Confirm Password</label>
+                        <input type="password" id="setupPasswordConfirm" required minlength="6" autocomplete="new-password">
+                    </div>
+                    <p id="setup-error" class="error-message hidden"></p>
+                    <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+                </form>
+            </section>
+        </main>
+
+        <!-- Dashboard (After Login) -->
+        <main id="dashboard-screen" class="host-main hidden">
+            <!-- Logout Bar -->
+            <div class="logout-bar">
+                <span id="welcome-user"></span>
+                <button class="btn btn-small btn-outline" onclick="handleLogout()">Logout</button>
+            </div>
+
             <!-- Create Session Section -->
             <section class="card">
                 <h2>Create New Session</h2>
@@ -95,9 +145,89 @@
 
     <script src="app.js"></script>
     <script>
+        // Screen management
+        const loginScreen = document.getElementById('login-screen');
+        const setupScreen = document.getElementById('setup-screen');
+        const dashboardScreen = document.getElementById('dashboard-screen');
+
+        function showScreen(screen) {
+            loginScreen.classList.add('hidden');
+            setupScreen.classList.add('hidden');
+            dashboardScreen.classList.add('hidden');
+            screen.classList.remove('hidden');
+        }
+
+        // Initialize - check auth state
         document.addEventListener('DOMContentLoaded', () => {
-            loadHostSessions();
+            if (!adminExists()) {
+                // First time - show setup
+                showScreen(setupScreen);
+            } else if (isLoggedIn()) {
+                // Already logged in
+                showDashboard();
+            } else {
+                // Show login
+                showScreen(loginScreen);
+            }
         });
+
+        // Setup form
+        document.getElementById('setup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('setupUsername').value.trim();
+            const password = document.getElementById('setupPassword').value;
+            const confirmPassword = document.getElementById('setupPasswordConfirm').value;
+            const errorEl = document.getElementById('setup-error');
+
+            if (password !== confirmPassword) {
+                errorEl.textContent = 'Passwords do not match';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            if (password.length < 6) {
+                errorEl.textContent = 'Password must be at least 6 characters';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            await createAdmin(username, password);
+            setLoggedIn();
+            showDashboard();
+        });
+
+        // Login form
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const errorEl = document.getElementById('login-error');
+
+            const valid = await verifyAdmin(username, password);
+
+            if (valid) {
+                errorEl.classList.add('hidden');
+                setLoggedIn();
+                showDashboard();
+            } else {
+                errorEl.classList.remove('hidden');
+            }
+        });
+
+        // Logout
+        function handleLogout() {
+            logout();
+            showScreen(loginScreen);
+            document.getElementById('login-form').reset();
+        }
+
+        // Show dashboard
+        function showDashboard() {
+            const admin = getAdmin();
+            document.getElementById('welcome-user').textContent = `Welcome, ${admin.username}`;
+            showScreen(dashboardScreen);
+            loadHostSessions();
+        }
 
         function loadHostSessions() {
             const sessions = getSessions();

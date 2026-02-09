@@ -2,6 +2,79 @@
 // Data is stored in localStorage
 
 const STORAGE_KEY = 'tunnelSessions';
+const ADMIN_KEY = 'tunnelSessionsAdmin';
+const SESSION_KEY = 'tunnelSessionsLoggedIn';
+
+// ============ ADMIN AUTHENTICATION ============
+
+// Simple hash function for password (not cryptographically secure, but fine for basic protection)
+async function hashPassword(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password + 'tunnelSalt2024');
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Check if admin account exists
+function adminExists() {
+    return localStorage.getItem(ADMIN_KEY) !== null;
+}
+
+// Get admin data
+function getAdmin() {
+    const data = localStorage.getItem(ADMIN_KEY);
+    return data ? JSON.parse(data) : null;
+}
+
+// Create admin account
+async function createAdmin(username, password) {
+    const hashedPassword = await hashPassword(password);
+    const admin = {
+        username: username,
+        passwordHash: hashedPassword,
+        createdAt: new Date().toISOString()
+    };
+    localStorage.setItem(ADMIN_KEY, JSON.stringify(admin));
+    return true;
+}
+
+// Verify admin login
+async function verifyAdmin(username, password) {
+    const admin = getAdmin();
+    if (!admin) return false;
+
+    const hashedPassword = await hashPassword(password);
+    return admin.username === username && admin.passwordHash === hashedPassword;
+}
+
+// Set logged in session
+function setLoggedIn() {
+    sessionStorage.setItem(SESSION_KEY, 'true');
+}
+
+// Check if logged in
+function isLoggedIn() {
+    return sessionStorage.getItem(SESSION_KEY) === 'true';
+}
+
+// Logout
+function logout() {
+    sessionStorage.removeItem(SESSION_KEY);
+}
+
+// Change password
+async function changePassword(currentPassword, newPassword) {
+    const admin = getAdmin();
+    if (!admin) return false;
+
+    const currentHash = await hashPassword(currentPassword);
+    if (admin.passwordHash !== currentHash) return false;
+
+    admin.passwordHash = await hashPassword(newPassword);
+    localStorage.setItem(ADMIN_KEY, JSON.stringify(admin));
+    return true;
+}
 
 // Generate unique ID
 function generateId() {
