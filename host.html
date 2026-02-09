@@ -726,10 +726,17 @@
             const sessions = getSessions();
             const container = document.getElementById('host-sessions-list');
             const noSessionsMsg = document.getElementById('no-host-sessions');
+            const now = new Date();
 
             container.innerHTML = '';
 
-            if (sessions.length === 0) {
+            // Filter out past sessions
+            const futureSessions = sessions.filter(s => {
+                const sessionDate = new Date(s.date + 'T' + s.time);
+                return sessionDate >= now;
+            });
+
+            if (futureSessions.length === 0) {
                 noSessionsMsg.classList.remove('hidden');
                 container.classList.add('hidden');
                 return;
@@ -739,13 +746,13 @@
             container.classList.remove('hidden');
 
             // Sort by date
-            sessions.sort((a, b) => {
+            futureSessions.sort((a, b) => {
                 const dateA = new Date(a.date + 'T' + a.time);
                 const dateB = new Date(b.date + 'T' + b.time);
                 return dateA - dateB;
             });
 
-            sessions.forEach(session => {
+            futureSessions.forEach(session => {
                 const card = createHostSessionCard(session);
                 container.appendChild(card);
             });
