@@ -275,14 +275,23 @@
             }
         });
 
-        // Login form
+        // Login form - accepts admin OR registered user with host access
         document.getElementById('login-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            const username = document.getElementById('loginUsername').value.trim();
+            const email = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value;
             const errorEl = document.getElementById('login-error');
 
-            const valid = verifyAdmin(username, password);
+            // Try admin login first
+            let valid = verifyAdmin(email, password);
+
+            // If not admin, try as registered user (all users can be hosts)
+            if (!valid) {
+                const user = verifyUser(email, password);
+                if (user) {
+                    valid = true;
+                }
+            }
 
             if (valid) {
                 errorEl.classList.add('hidden');
