@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Import SignUpGenius Data</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Import SignUpGenius Data</h1>
+        </header>
+        <main>
+            <section class="card">
+                <div id="status"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js?v=5"></script>
+    <script>
+        // February 2026 ShredClub sessions from SignUpGenius
+        const sessionsToImport = [
+            // February 4, 2026 (Wednesday)
+            { date: '2026-02-04', time: '19:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
+            { date: '2026-02-04', time: '20:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
+            { date: '2026-02-04', time: '21:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
+
+            // February 11, 2026 (Wednesday)
+            { date: '2026-02-11', time: '19:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
+            { date: '2026-02-11', time: '20:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
+            { date: '2026-02-11', time: '21:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
+
+            // February 18, 2026 (Wednesday)
+            { date: '2026-02-18', time: '19:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
+            { date: '2026-02-18', time: '20:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
+            { date: '2026-02-18', time: '21:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
+
+            // February 25, 2026 (Wednesday)
+            { date: '2026-02-25', time: '19:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
+            { date: '2026-02-25', time: '20:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
+            { date: '2026-02-25', time: '21:00', sessionType: 'ShredClub', duration: 60, capacity: 4 },
+        ];
+
+        let statusHtml = '<h2>Importing February ShredClub Sessions...</h2><ul>';
+        let created = 0;
+        let skipped = 0;
+
+        sessionsToImport.forEach(sessionData => {
+            const session = createSession(sessionData);
+            const dateObj = new Date(sessionData.date + 'T' + sessionData.time);
+            const dateStr = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            const timeStr = dateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+            if (session) {
+                statusHtml += `<li style="color: var(--success-color);">✓ Created: ${sessionData.sessionType} - ${dateStr} @ ${timeStr}</li>`;
+                created++;
+            } else {
+                statusHtml += `<li style="color: orange;">⚠ Already exists: ${sessionData.sessionType} - ${dateStr} @ ${timeStr}</li>`;
+                skipped++;
+            }
+        });
+
+        statusHtml += '</ul>';
+        statusHtml += `<p style="margin-top: 20px; font-size: 1.1rem;"><strong>Summary:</strong> ${created} created, ${skipped} already existed</p>`;
+        statusHtml += '<p style="margin-top: 20px;"><a href="host.html" class="btn btn-primary">Go to Host Dashboard</a></p>';
+        statusHtml += '<p style="margin-top: 10px;"><a href="index.html" class="btn btn-outline">Go to Booking Page</a></p>';
+
+        document.getElementById('status').innerHTML = statusHtml;
+    </script>
+</body>
+</html>
