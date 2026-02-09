@@ -19,7 +19,7 @@
 
     <script src="app.js?v=4"></script>
     <script>
-        const today = '2026-02-09';
+        const today = new Date().toISOString().split('T')[0];
 
         // Create test sessions for today
         const testSessions = [
