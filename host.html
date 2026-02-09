@@ -62,7 +62,10 @@
             <!-- Logout Bar -->
             <div class="logout-bar">
                 <span id="welcome-user"></span>
-                <button class="btn btn-small btn-outline" onclick="handleLogout()">Logout</button>
+                <div class="logout-actions">
+                    <button class="btn btn-small btn-outline" onclick="openChangePasswordModal()">Change Password</button>
+                    <button class="btn btn-small btn-outline" onclick="handleLogout()">Logout</button>
+                </div>
             </div>
 
             <!-- Create Session Section -->
@@ -140,6 +143,31 @@
                             <input type="text" id="addLastName" required>
                         </div>
                         <button type="submit" class="btn btn-primary">Add Person</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Change Password Modal -->
+            <div id="change-password-modal" class="modal hidden">
+                <div class="modal-content">
+                    <span class="close-btn">&times;</span>
+                    <h3>Change Password</h3>
+                    <form id="change-password-form">
+                        <div class="form-group">
+                            <label for="currentPassword">Current Password</label>
+                            <input type="password" id="currentPassword" required autocomplete="current-password">
+                        </div>
+                        <div class="form-group">
+                            <label for="newPassword">New Password</label>
+                            <input type="password" id="newPassword" required minlength="6" autocomplete="new-password">
+                        </div>
+                        <div class="form-group">
+                            <label for="confirmNewPassword">Confirm New Password</label>
+                            <input type="password" id="confirmNewPassword" required minlength="6" autocomplete="new-password">
+                        </div>
+                        <p id="change-password-error" class="error-message hidden"></p>
+                        <p id="change-password-success" class="success-message hidden">Password changed successfully!</p>
+                        <button type="submit" class="btn btn-primary btn-full">Update Password</button>
                     </form>
                 </div>
             </div>
@@ -455,6 +483,61 @@
             if (e.target.classList.contains('modal')) {
                 e.target.classList.add('hidden');
                 document.getElementById('add-person-form').reset();
+                document.getElementById('change-password-form').reset();
+                document.getElementById('change-password-error').classList.add('hidden');
+                document.getElementById('change-password-success').classList.add('hidden');
+            }
+        });
+
+        // Change Password Modal
+        function openChangePasswordModal() {
+            document.getElementById('change-password-modal').classList.remove('hidden');
+            document.getElementById('currentPassword').focus();
+        }
+
+        document.querySelector('#change-password-modal .close-btn').addEventListener('click', () => {
+            document.getElementById('change-password-modal').classList.add('hidden');
+            document.getElementById('change-password-form').reset();
+            document.getElementById('change-password-error').classList.add('hidden');
+            document.getElementById('change-password-success').classList.add('hidden');
+        });
+
+        document.getElementById('change-password-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+            const errorEl = document.getElementById('change-password-error');
+            const successEl = document.getElementById('change-password-success');
+
+            errorEl.classList.add('hidden');
+            successEl.classList.add('hidden');
+
+            if (newPassword !== confirmNewPassword) {
+                errorEl.textContent = 'New passwords do not match';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            if (newPassword.length < 6) {
+                errorEl.textContent = 'New password must be at least 6 characters';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            const success = await changePassword(currentPassword, newPassword);
+
+            if (success) {
+                successEl.classList.remove('hidden');
+                document.getElementById('change-password-form').reset();
+                setTimeout(() => {
+                    document.getElementById('change-password-modal').classList.add('hidden');
+                    successEl.classList.add('hidden');
+                }, 1500);
+            } else {
+                errorEl.textContent = 'Current password is incorrect';
+                errorEl.classList.remove('hidden');
             }
         });
     </script>

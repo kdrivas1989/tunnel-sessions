@@ -476,6 +476,16 @@ footer {
     text-align: center;
 }
 
+.success-message {
+    color: var(--success-color);
+    font-size: 0.9rem;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: #f0fdf4;
+    border-radius: 6px;
+    text-align: center;
+}
+
 /* Logout Bar */
 .logout-bar {
     display: flex;
@@ -485,11 +495,18 @@ footer {
     background: white;
     border-radius: 12px;
     box-shadow: var(--shadow);
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .logout-bar span {
     font-weight: 500;
     color: var(--text-primary);
+}
+
+.logout-actions {
+    display: flex;
+    gap: 10px;
 }
 
 .btn-outline {
