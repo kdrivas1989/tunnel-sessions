@@ -9,7 +9,7 @@
 <body>
     <div class="container">
         <header>
-            <img src="logo.svg" alt="Tunnel Sessions Logo" class="logo">
+            <img src="shredclub-logo.png" alt="Shred Club Logo" class="logo-png">
             <h1>Tunnel Sessions</h1>
             <p class="tagline">Indoor Skydiving Experience</p>
         </header>
@@ -17,7 +17,7 @@
         <!-- User Bar -->
         <div id="user-bar" class="user-bar">
             <div id="user-logged-out">
-                <button class="btn btn-small btn-outline" onclick="openLoginModal()">Login</button>
+                <button class="btn btn-small btn-join" onclick="openLoginModal()">Login</button>
                 <button class="btn btn-small btn-primary" onclick="openRegisterModal()">Sign Up</button>
             </div>
             <div id="user-logged-in" class="hidden">
@@ -90,20 +90,42 @@
 
             <!-- Booking Modal (for guests) -->
             <div id="booking-modal" class="modal hidden">
-                <div class="modal-content">
+                <div class="modal-content" style="max-width: 500px;">
                     <span class="close-btn">&times;</span>
                     <h3>Book Your Spot</h3>
                     <div id="session-details"></div>
                     <form id="booking-form">
                         <div class="form-group">
-                            <label for="firstName">First Name</label>
-                            <input type="text" id="firstName" name="firstName" required>
+                            <label for="numSlots">How many spots?</label>
+                            <select id="numSlots" onchange="updateBookingSlots()">
+                                <option value="1">1 spot</option>
+                                <option value="2">2 spots</option>
+                                <option value="3">3 spots</option>
+                                <option value="4">4 spots</option>
+                            </select>
                         </div>
-                        <div class="form-group">
-                            <label for="lastName">Last Name</label>
-                            <input type="text" id="lastName" name="lastName" required>
+
+                        <div id="booking-slots">
+                            <div class="booking-slot" data-slot="1">
+                                <h4 style="margin: 15px 0 10px; color: var(--primary-color);">Person 1</h4>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="firstName1">First Name</label>
+                                        <input type="text" id="firstName1" name="firstName1" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="lastName1">Last Name</label>
+                                        <input type="text" id="lastName1" name="lastName1" required>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="notes1">Notes (optional)</label>
+                                    <input type="text" id="notes1" name="notes1" placeholder="e.g., Stability Drills, Back Fly">
+                                </div>
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-primary">Confirm Booking</button>
+
+                        <button type="submit" class="btn btn-primary btn-full">Confirm Booking</button>
                     </form>
                     <p class="modal-switch">Have an account? <a href="#" onclick="switchToLoginFromBooking()">Login for quick booking</a></p>
                 </div>
@@ -368,16 +390,66 @@
                 year: 'numeric'
             });
             const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const spotsLeft = session.capacity - session.bookings.length;
 
             const badgeClass = getSessionTypeClass(session.sessionType);
+
+            // Build list of already booked participants
+            let bookedHtml = '';
+            if (session.bookings && session.bookings.length > 0) {
+                const names = session.bookings.map(b => `${b.firstName} ${b.lastName}`).join(', ');
+                bookedHtml = `<p style="margin-top: 10px; font-size: 0.9rem; color: var(--text-secondary);"><strong>Already booked:</strong> ${names}</p>`;
+            }
+
             document.getElementById('session-details').innerHTML = `
                 <p class="session-type-badge ${badgeClass}">${session.sessionType || 'Session'}</p>
                 <p><strong>${dateStr}</strong></p>
                 <p>${timeStr} - ${session.duration} minutes</p>
+                <p style="color: var(--success-color); font-weight: 500;">${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} available</p>
+                ${bookedHtml}
             `;
 
+            // Update slot dropdown based on available spots
+            const numSlotsSelect = document.getElementById('numSlots');
+            numSlotsSelect.innerHTML = '';
+            for (let i = 1; i <= Math.min(spotsLeft, 4); i++) {
+                numSlotsSelect.innerHTML += `<option value="${i}">${i} spot${i !== 1 ? 's' : ''}</option>`;
+            }
+            numSlotsSelect.value = '1';
+            updateBookingSlots();
+
             document.getElementById('booking-modal').classList.remove('hidden');
-            document.getElementById('firstName').focus();
+            document.getElementById('firstName1').focus();
+        }
+
+        // Update booking slot fields based on number selected
+        function updateBookingSlots() {
+            const numSlots = parseInt(document.getElementById('numSlots').value);
+            const slotsContainer = document.getElementById('booking-slots');
+
+            let html = '';
+            for (let i = 1; i <= numSlots; i++) {
+                html += `
+                    <div class="booking-slot" data-slot="${i}">
+                        <h4 style="margin: 15px 0 10px; color: var(--primary-color);">Person ${i}</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="firstName${i}">First Name</label>
+                                <input type="text" id="firstName${i}" name="firstName${i}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="lastName${i}">Last Name</label>
+                                <input type="text" id="lastName${i}" name="lastName${i}" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="notes${i}">Notes (optional)</label>
+                            <input type="text" id="notes${i}" name="notes${i}" placeholder="e.g., Stability Drills, Back Fly">
+                        </div>
+                    </div>
+                `;
+            }
+            slotsContainer.innerHTML = html;
         }
 
         document.querySelector('#booking-modal .close-btn').addEventListener('click', () => {
@@ -388,17 +460,25 @@
         document.getElementById('booking-form').addEventListener('submit', (e) => {
             e.preventDefault();
 
-            const firstName = document.getElementById('firstName').value.trim();
-            const lastName = document.getElementById('lastName').value.trim();
+            const numSlots = parseInt(document.getElementById('numSlots').value);
+            const bookings = [];
 
-            if (!firstName || !lastName) {
-                alert('Please enter your first and last name');
-                return;
+            for (let i = 1; i <= numSlots; i++) {
+                const firstName = document.getElementById(`firstName${i}`).value.trim();
+                const lastName = document.getElementById(`lastName${i}`).value.trim();
+                const notes = document.getElementById(`notes${i}`).value.trim();
+
+                if (!firstName || !lastName) {
+                    alert(`Please enter name for Person ${i}`);
+                    return;
+                }
+
+                bookings.push({ firstName, lastName, notes });
             }
 
-            const success = addBooking(selectedSessionId, firstName, lastName);
+            const result = addMultipleBookings(selectedSessionId, bookings);
 
-            if (success) {
+            if (result.success) {
                 document.getElementById('booking-modal').classList.add('hidden');
                 document.getElementById('booking-form').reset();
 
@@ -411,13 +491,14 @@
                 });
                 const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
+                const names = bookings.map(b => `${b.firstName} ${b.lastName}`).join(', ');
                 document.getElementById('success-message').innerHTML =
-                    `${firstName} ${lastName}, you're booked for<br><strong>${dateStr} at ${timeStr}</strong>`;
+                    `${names}<br>booked for<br><strong>${dateStr} at ${timeStr}</strong>`;
                 document.getElementById('success-modal').classList.remove('hidden');
 
                 loadAvailableSessions();
             } else {
-                alert('Sorry, this session is now full. Please choose another time.');
+                alert(result.error || 'Sorry, this session is now full. Please choose another time.');
                 loadAvailableSessions();
             }
         });

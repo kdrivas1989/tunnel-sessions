@@ -230,8 +230,8 @@ function deleteSessionById(sessionId) {
     saveSessions(sessions);
 }
 
-// Add a booking to a session
-function addBooking(sessionId, firstName, lastName) {
+// Add a booking to a session (now supports notes)
+function addBooking(sessionId, firstName, lastName, notes = '') {
     const sessions = getSessions();
     const sessionIndex = sessions.findIndex(s => s.id === sessionId);
 
@@ -248,11 +248,41 @@ function addBooking(sessionId, firstName, lastName) {
     session.bookings.push({
         firstName,
         lastName,
+        notes: notes || '',
         bookedAt: new Date().toISOString()
     });
 
     saveSessions(sessions);
     return true;
+}
+
+// Add multiple bookings to a session at once (for booking multiple slots)
+function addMultipleBookings(sessionId, bookings) {
+    const sessions = getSessions();
+    const sessionIndex = sessions.findIndex(s => s.id === sessionId);
+
+    if (sessionIndex === -1) {
+        return { success: false, error: 'Session not found' };
+    }
+
+    const session = sessions[sessionIndex];
+    const spotsLeft = session.capacity - session.bookings.length;
+
+    if (bookings.length > spotsLeft) {
+        return { success: false, error: `Only ${spotsLeft} spot(s) available` };
+    }
+
+    bookings.forEach(booking => {
+        session.bookings.push({
+            firstName: booking.firstName,
+            lastName: booking.lastName,
+            notes: booking.notes || '',
+            bookedAt: new Date().toISOString()
+        });
+    });
+
+    saveSessions(sessions);
+    return { success: true, added: bookings.length };
 }
 
 // Remove a booking from a session (host only)

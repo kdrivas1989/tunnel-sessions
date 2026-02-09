@@ -1,24 +1,33 @@
 #!/bin/bash
 
 # Tunnel Sessions - Automatic Daily Text Script
-# Sends ONE text at 12pm with all sessions for the day
+# Sends texts at 12pm to ALL configured phone numbers with all sessions for the day
 
 open -a Safari "http://booking.kd-evolution.com/auto-text.html"
 sleep 4
 
 osascript << 'EOF'
 tell application "Safari"
-    -- Get phone number and combined message from the page
+    -- Get combined message and phone numbers from the page
     set jsCode to "
         (function() {
             const settings = JSON.parse(localStorage.getItem('tunnelSessionsSettings') || '{}');
-            const phoneNumber = settings.autoTextPhone || '9784917053';
+
+            // Get phone numbers (support both old and new format)
+            let phones = [];
+            if (settings.autoTextPhones && settings.autoTextPhones.length > 0) {
+                phones = settings.autoTextPhones;
+            } else if (settings.autoTextPhone) {
+                phones = [settings.autoTextPhone];
+            } else {
+                phones = ['9784917053'];
+            }
 
             const today = new Date().toISOString().split('T')[0];
             const sessions = JSON.parse(localStorage.getItem('tunnelSessions') || '[]');
             const todaysSessions = sessions.filter(s => s.date === today && s.bookings && s.bookings.length > 0);
 
-            if (todaysSessions.length === 0) return JSON.stringify({phone: phoneNumber, message: ''});
+            if (todaysSessions.length === 0) return '';
 
             // Sort by time
             todaysSessions.sort((a, b) => a.time.localeCompare(b.time));
@@ -40,27 +49,43 @@ tell application "Safari"
                 message += s.sessionType + ' @ ' + timeStr + '\\n' + names + '\\n\\n';
             });
 
-            return JSON.stringify({phone: phoneNumber, message: message.trim()});
+            // Return phones joined by comma, then ||| separator, then message
+            return phones.join(',') + '|||' + message.trim();
         })();
     "
-    set jsonResult to do JavaScript jsCode in current tab of front window
-
-    -- Parse the phone number
-    set phoneCode to "JSON.parse('" & jsonResult & "').phone"
-    set phoneNumber to do JavaScript phoneCode in current tab of front window
-
-    -- Parse message
-    set msgCode to "JSON.parse('" & jsonResult & "').message"
-    set msg to do JavaScript msgCode in current tab of front window
+    set resultText to do JavaScript jsCode in current tab of front window
 end tell
 
-if msg is not "" then
+if resultText is not "" then
+    set AppleScript's text item delimiters to "|||"
+    set resultParts to text items of resultText
+    set phoneNumbersStr to item 1 of resultParts
+    set msg to item 2 of resultParts
+    set AppleScript's text item delimiters to ""
+
+    -- Split phone numbers by comma
+    set AppleScript's text item delimiters to ","
+    set phoneNumbers to text items of phoneNumbersStr
+    set AppleScript's text item delimiters to ""
+
+    set sentCount to 0
+
     tell application "Messages"
         set targetService to 1st account whose service type = iMessage
-        set targetBuddy to participant phoneNumber of targetService
-        send msg to targetBuddy
+
+        repeat with phoneNumber in phoneNumbers
+            try
+                set targetBuddy to participant phoneNumber of targetService
+                send msg to targetBuddy
+                set sentCount to sentCount + 1
+                delay 1
+            on error errMsg
+                log "Failed to send to " & phoneNumber & ": " & errMsg
+            end try
+        end repeat
     end tell
-    return "Sent daily text to " & phoneNumber
+
+    return "Sent daily text to " & sentCount & " recipient(s)"
 else
     return "No sessions with participants today"
 end if
