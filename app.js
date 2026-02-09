@@ -57,17 +57,17 @@ function verifyAdmin(username, password) {
 
 // Set logged in session
 function setLoggedIn() {
-    sessionStorage.setItem(SESSION_KEY, 'true');
+    localStorage.setItem(SESSION_KEY, 'true');
 }
 
 // Check if logged in
 function isLoggedIn() {
-    return sessionStorage.getItem(SESSION_KEY) === 'true';
+    return localStorage.getItem(SESSION_KEY) === 'true';
 }
 
 // Logout
 function logout() {
-    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
 }
 
 // Change password
@@ -159,7 +159,7 @@ function verifyUser(email, password) {
 
 // Set user logged in
 function setUserLoggedIn(user) {
-    sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify({
+    localStorage.setItem(USER_SESSION_KEY, JSON.stringify({
         id: user.id,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -169,18 +169,18 @@ function setUserLoggedIn(user) {
 
 // Check if user is logged in
 function isUserLoggedIn() {
-    return sessionStorage.getItem(USER_SESSION_KEY) !== null;
+    return localStorage.getItem(USER_SESSION_KEY) !== null;
 }
 
 // Get current logged in user
 function getCurrentUser() {
-    const data = sessionStorage.getItem(USER_SESSION_KEY);
+    const data = localStorage.getItem(USER_SESSION_KEY);
     return data ? JSON.parse(data) : null;
 }
 
 // Logout user
 function logoutUser() {
-    sessionStorage.removeItem(USER_SESSION_KEY);
+    localStorage.removeItem(USER_SESSION_KEY);
 }
 
 // ============ HOST AUTHENTICATION ============

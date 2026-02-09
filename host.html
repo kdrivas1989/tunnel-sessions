@@ -321,7 +321,7 @@
             const host = verifyHost(email, password);
             if (host) {
                 valid = true;
-                sessionStorage.setItem('hostRole', 'host');
+                localStorage.setItem('hostRole', 'host');
             }
 
             // If not host, try admin login
@@ -329,7 +329,7 @@
                 const isAdmin = verifyAdmin(email, password);
                 if (isAdmin) {
                     valid = true;
-                    sessionStorage.setItem('hostRole', 'admin');
+                    localStorage.setItem('hostRole', 'admin');
                 }
             }
 
@@ -345,14 +345,14 @@
         // Logout
         function handleLogout() {
             logout();
-            sessionStorage.removeItem('hostRole');
+            localStorage.removeItem('hostRole');
             showScreen(loginScreen);
             document.getElementById('login-form').reset();
         }
 
         // Show dashboard
         function showDashboard() {
-            const role = sessionStorage.getItem('hostRole') || 'host';
+            const role = localStorage.getItem('hostRole') || 'host';
             const admin = getAdmin();
 
             if (role === 'admin' && admin) {
