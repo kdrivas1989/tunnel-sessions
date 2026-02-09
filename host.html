@@ -179,7 +179,7 @@
         </footer>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=2"></script>
     <script>
         // Screen management
         const loginScreen = document.getElementById('login-screen');
@@ -215,6 +215,14 @@
             const confirmPassword = document.getElementById('setupPasswordConfirm').value;
             const errorEl = document.getElementById('setup-error');
 
+            errorEl.classList.add('hidden');
+
+            if (!username || username.length < 3) {
+                errorEl.textContent = 'Username must be at least 3 characters';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
             if (password !== confirmPassword) {
                 errorEl.textContent = 'Passwords do not match';
                 errorEl.classList.remove('hidden');
@@ -227,9 +235,15 @@
                 return;
             }
 
-            createAdmin(username, password);
-            setLoggedIn();
-            showDashboard();
+            try {
+                createAdmin(username, password);
+                setLoggedIn();
+                showDashboard();
+            } catch (err) {
+                errorEl.textContent = 'Error creating account: ' + err.message;
+                errorEl.classList.remove('hidden');
+                console.error('Setup error:', err);
+            }
         });
 
         // Login form
