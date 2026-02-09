@@ -183,6 +183,18 @@ section h2 {
     letter-spacing: 0.5px;
 }
 
+.session-type-badge.shredclub {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+.session-type-badge.rookie {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+}
+
+.session-type-badge.advanced {
+    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+}
+
 .day-name {
     font-size: 1.25rem;
     font-weight: 600;

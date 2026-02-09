@@ -164,6 +164,16 @@ function logoutUser() {
 
 // ============ SESSIONS & BOOKINGS ============
 
+// Get CSS class for session type badge
+function getSessionTypeClass(sessionType) {
+    if (!sessionType) return '';
+    const type = sessionType.toLowerCase();
+    if (type.includes('shredclub') || type.includes('shred')) return 'shredclub';
+    if (type.includes('rookie')) return 'rookie';
+    if (type.includes('advanced')) return 'advanced';
+    return '';
+}
+
 // Generate unique ID
 function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);

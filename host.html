@@ -181,7 +181,7 @@
         </footer>
     </div>
 
-    <script src="app.js?v=2"></script>
+    <script src="app.js?v=4"></script>
     <script>
         // Screen management
         const loginScreen = document.getElementById('login-screen');
@@ -384,6 +384,7 @@
                 year: 'numeric'
             });
             const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const badgeClass = getSessionTypeClass(session.sessionType);
 
             let bookingsHtml = '';
             if (session.bookings.length > 0) {
@@ -404,7 +405,7 @@
             card.innerHTML = `
                 <div class="host-session-header">
                     <div>
-                        <span class="session-type-badge">${session.sessionType || 'Session'}</span>
+                        <span class="session-type-badge ${badgeClass}">${session.sessionType || 'Session'}</span>
                         <h3>${dateStr}</h3>
                         <p>${timeStr} - ${session.duration} min | ${session.bookings.length}/${session.capacity} booked</p>
                     </div>
@@ -491,9 +492,10 @@
                 day: 'numeric'
             });
             const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const badgeClass = getSessionTypeClass(session.sessionType);
 
             document.getElementById('add-session-details').innerHTML = `
-                <p class="session-type-badge">${session.sessionType || 'Session'}</p>
+                <p class="session-type-badge ${badgeClass}">${session.sessionType || 'Session'}</p>
                 <p><strong>${dateStr}</strong></p>
                 <p>${timeStr} - ${session.bookings.length}/${session.capacity} booked</p>
             `;
