@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Remove Test Data</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Remove Test Data</h1>
+        </header>
+        <main>
+            <section class="card">
+                <div id="status"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js?v=6"></script>
+    <script>
+        const today = new Date().toISOString().split('T')[0];
+        let sessions = getSessions();
+        const originalCount = sessions.length;
+
+        // Remove test sessions (today's sessions at test times with test names)
+        const testTimes = ['14:00', '15:30', '19:00'];
+        const testNames = ['John', 'Sarah', 'Mike', 'Emma', 'Chris', 'Lisa'];
+
+        sessions = sessions.filter(s => {
+            // Check if it's a test session (today + test times + has test bookings)
+            if (s.date === today && testTimes.includes(s.time)) {
+                const hasTestBookings = s.bookings && s.bookings.some(b =>
+                    testNames.includes(b.firstName)
+                );
+                if (hasTestBookings || s.bookings.length === 0) {
+                    return false; // Remove this session
+                }
+            }
+            return true; // Keep this session
+        });
+
+        saveSessions(sessions);
+        const removedCount = originalCount - sessions.length;
+
+        let statusHtml = '<h2>Test Data Removed</h2>';
+        statusHtml += `<p style="margin-top: 15px;">${removedCount} test session(s) removed.</p>`;
+        statusHtml += `<p>${sessions.length} session(s) remaining.</p>`;
+        statusHtml += '<p style="margin-top: 30px;"><a href="host.html" class="btn btn-primary">Go to Host Dashboard</a></p>';
+        statusHtml += '<p style="margin-top: 15px;"><a href="index.html" class="btn btn-outline">Go to Booking Page</a></p>';
+
+        document.getElementById('status').innerHTML = statusHtml;
+    </script>
+</body>
+</html>
