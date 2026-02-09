@@ -46,7 +46,7 @@
         let statusHtml = '<h2>Test Data Removed</h2>';
         statusHtml += `<p style="margin-top: 15px;">${removedCount} test session(s) removed.</p>`;
         statusHtml += `<p>${sessions.length} session(s) remaining.</p>`;
-        statusHtml += '<div style="margin-top: 30px; display: flex; gap: 15px; flex-wrap: wrap;"><a href="host.html" class="btn btn-primary">Go to Host Dashboard</a><a href="index.html" class="btn btn-outline">Go to Booking Page</a></div>';
+        statusHtml += '<div style="margin-top: 30px; display: flex; flex-direction: row; gap: 15px;"><a href="host.html" class="btn btn-primary" style="display: inline-block;">Go to Host Dashboard</a><a href="index.html" class="btn btn-outline" style="display: inline-block;">Go to Booking Page</a></div>';
 
         document.getElementById('status').innerHTML = statusHtml;
     </script>
