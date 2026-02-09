@@ -354,6 +354,50 @@ function removeBookingFromSession(sessionId, bookingIndex) {
     return true;
 }
 
+// Cancel a user's own booking (72 hours before session required)
+function cancelUserBooking(sessionId, firstName, lastName) {
+    const sessions = getSessions();
+    const sessionIndex = sessions.findIndex(s => s.id === sessionId);
+
+    if (sessionIndex === -1) {
+        return { success: false, error: 'Session not found' };
+    }
+
+    const session = sessions[sessionIndex];
+    const sessionDateTime = new Date(session.date + 'T' + session.time);
+    const now = new Date();
+    const hoursUntilSession = (sessionDateTime - now) / (1000 * 60 * 60);
+
+    // Must be at least 72 hours before session
+    if (hoursUntilSession < 72) {
+        return { success: false, error: 'Cancellations must be made at least 72 hours before the session' };
+    }
+
+    // Find and remove the booking
+    const bookingIndex = session.bookings.findIndex(b =>
+        b.firstName.toLowerCase() === firstName.toLowerCase() &&
+        b.lastName.toLowerCase() === lastName.toLowerCase()
+    );
+
+    if (bookingIndex === -1) {
+        return { success: false, error: 'Booking not found' };
+    }
+
+    const cancelledBooking = session.bookings[bookingIndex];
+    session.bookings.splice(bookingIndex, 1);
+    saveSessions(sessions);
+
+    // Check if within a week (168 hours) - need to notify host
+    const needsNotification = hoursUntilSession <= 168;
+
+    return {
+        success: true,
+        needsNotification,
+        session,
+        cancelledBooking
+    };
+}
+
 // Update a session
 function updateSession(sessionId, updates) {
     const sessions = getSessions();

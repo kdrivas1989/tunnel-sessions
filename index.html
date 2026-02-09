@@ -35,6 +35,15 @@
                 <div id="sessions-list" class="sessions-grid"></div>
             </section>
 
+            <!-- My Bookings Section (logged in users only) -->
+            <section id="my-bookings-section" class="hidden" style="margin-top: 30px;">
+                <h2>My Bookings</h2>
+                <div id="my-bookings-list"></div>
+                <div id="no-my-bookings" class="message hidden">
+                    <p>You have no upcoming bookings.</p>
+                </div>
+            </section>
+
             <!-- Login Modal -->
             <div id="login-modal" class="modal hidden">
                 <div class="modal-content">
@@ -155,6 +164,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             updateUserBar();
             loadAvailableSessions();
+            loadMyBookings();
         });
 
         // Update user bar based on login status
@@ -206,6 +216,132 @@
                 const card = createSessionCard(session);
                 sessionsContainer.appendChild(card);
             });
+        }
+
+        // Load user's bookings
+        function loadMyBookings() {
+            const section = document.getElementById('my-bookings-section');
+            const container = document.getElementById('my-bookings-list');
+            const noBookingsMsg = document.getElementById('no-my-bookings');
+
+            if (!isUserLoggedIn()) {
+                section.classList.add('hidden');
+                return;
+            }
+
+            section.classList.remove('hidden');
+            const user = getCurrentUser();
+            const sessions = getSessions();
+            const now = new Date();
+
+            // Find all sessions where this user has a booking
+            const myBookings = [];
+            sessions.forEach(session => {
+                const sessionDateTime = new Date(session.date + 'T' + session.time);
+                if (sessionDateTime > now) {
+                    session.bookings.forEach((booking, index) => {
+                        if (booking.firstName.toLowerCase() === user.firstName.toLowerCase() &&
+                            booking.lastName.toLowerCase() === user.lastName.toLowerCase()) {
+                            myBookings.push({ session, booking, bookingIndex: index });
+                        }
+                    });
+                }
+            });
+
+            if (myBookings.length === 0) {
+                noBookingsMsg.classList.remove('hidden');
+                container.innerHTML = '';
+                return;
+            }
+
+            noBookingsMsg.classList.add('hidden');
+
+            // Sort by date
+            myBookings.sort((a, b) => {
+                const dateA = new Date(a.session.date + 'T' + a.session.time);
+                const dateB = new Date(b.session.date + 'T' + b.session.time);
+                return dateA - dateB;
+            });
+
+            let html = '<div class="sessions-grid">';
+            myBookings.forEach(({ session, booking }) => {
+                const sessionDateTime = new Date(session.date + 'T' + session.time);
+                const hoursUntil = (sessionDateTime - now) / (1000 * 60 * 60);
+                const canCancel = hoursUntil >= 72;
+
+                const dateStr = sessionDateTime.toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric'
+                });
+                const timeStr = sessionDateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                const badgeClass = getSessionTypeClass(session.sessionType);
+
+                html += `
+                    <div class="session-card">
+                        <div class="session-date">
+                            <span class="session-type-badge ${badgeClass}">${session.sessionType || 'Session'}</span>
+                            <span class="day-name">${dateStr}</span>
+                        </div>
+                        <div class="session-info">
+                            <span class="session-time">${timeStr}</span>
+                            <span class="session-duration">${session.duration} minutes</span>
+                            ${booking.notes ? `<span style="color: var(--text-secondary); font-size: 0.9rem;">Note: ${booking.notes}</span>` : ''}
+                        </div>
+                        ${canCancel
+                            ? `<button class="btn btn-danger btn-small" onclick="cancelMyBooking('${session.id}')">Cancel Booking</button>`
+                            : `<p style="color: var(--text-secondary); font-size: 0.85rem; text-align: center;">Cannot cancel within 72 hours</p>`
+                        }
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // Cancel user's booking
+        function cancelMyBooking(sessionId) {
+            const user = getCurrentUser();
+            if (!user) return;
+
+            if (!confirm('Are you sure you want to cancel this booking?')) return;
+
+            const result = cancelUserBooking(sessionId, user.firstName, user.lastName);
+
+            if (result.success) {
+                // If within a week, send text to host
+                if (result.needsNotification) {
+                    sendCancellationText(result.session, result.cancelledBooking);
+                }
+
+                alert('Booking cancelled successfully.');
+                loadAvailableSessions();
+                loadMyBookings();
+            } else {
+                alert(result.error);
+            }
+        }
+
+        // Send cancellation text to host
+        function sendCancellationText(session, booking) {
+            const settings = JSON.parse(localStorage.getItem('tunnelSessionsSettings') || '{}');
+            const phones = settings.autoTextPhones || [settings.autoTextPhone || '9784917053'];
+
+            const sessionDateTime = new Date(session.date + 'T' + session.time);
+            const dateStr = sessionDateTime.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'short',
+                day: 'numeric'
+            });
+            const timeStr = sessionDateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+            const message = `CANCELLATION: ${booking.firstName} ${booking.lastName} has cancelled their booking for ${session.sessionType} on ${dateStr} at ${timeStr}`;
+
+            // Open SMS to first phone number
+            if (phones.length > 0) {
+                const smsUrl = `sms:${phones[0]}&body=${encodeURIComponent(message)}`;
+                window.open(smsUrl, '_blank');
+            }
         }
 
         function createSessionCard(session) {
@@ -303,6 +439,7 @@
                 errorEl.classList.add('hidden');
                 updateUserBar();
                 loadAvailableSessions();
+                loadMyBookings();
             } else {
                 errorEl.classList.remove('hidden');
             }
@@ -343,6 +480,7 @@
                 errorEl.classList.add('hidden');
                 updateUserBar();
                 loadAvailableSessions();
+                loadMyBookings();
             } else {
                 errorEl.textContent = result.error;
                 errorEl.classList.remove('hidden');
@@ -373,6 +511,7 @@
             logoutUser();
             updateUserBar();
             loadAvailableSessions();
+            loadMyBookings();
         }
 
         // Booking Modal (for guests)
