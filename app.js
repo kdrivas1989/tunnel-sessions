@@ -4,6 +4,8 @@
 const STORAGE_KEY = 'tunnelSessions';
 const ADMIN_KEY = 'tunnelSessionsAdmin';
 const SESSION_KEY = 'tunnelSessionsLoggedIn';
+const USERS_KEY = 'tunnelSessionsUsers';
+const USER_SESSION_KEY = 'tunnelSessionsCurrentUser';
 
 // ============ ADMIN AUTHENTICATION ============
 
@@ -79,6 +81,88 @@ function changePassword(currentPassword, newPassword) {
     localStorage.setItem(ADMIN_KEY, JSON.stringify(admin));
     return true;
 }
+
+// ============ USER AUTHENTICATION ============
+
+// Get all users
+function getUsers() {
+    const data = localStorage.getItem(USERS_KEY);
+    return data ? JSON.parse(data) : [];
+}
+
+// Save users
+function saveUsers(users) {
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+// Create user account
+function createUser(firstName, lastName, email, password) {
+    const users = getUsers();
+
+    // Check if email already exists
+    if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+        return { success: false, error: 'Email already registered' };
+    }
+
+    const newUser = {
+        id: generateId(),
+        firstName: firstName,
+        lastName: lastName,
+        email: email.toLowerCase(),
+        passwordHash: hashPassword(password),
+        createdAt: new Date().toISOString()
+    };
+
+    users.push(newUser);
+    saveUsers(users);
+    return { success: true, user: newUser };
+}
+
+// Get user by email
+function getUserByEmail(email) {
+    const users = getUsers();
+    return users.find(u => u.email.toLowerCase() === email.toLowerCase());
+}
+
+// Verify user login
+function verifyUser(email, password) {
+    const user = getUserByEmail(email);
+    if (!user) return null;
+
+    const hashedPassword = hashPassword(password);
+    if (user.passwordHash === hashedPassword) {
+        return user;
+    }
+    return null;
+}
+
+// Set user logged in
+function setUserLoggedIn(user) {
+    sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify({
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email
+    }));
+}
+
+// Check if user is logged in
+function isUserLoggedIn() {
+    return sessionStorage.getItem(USER_SESSION_KEY) !== null;
+}
+
+// Get current logged in user
+function getCurrentUser() {
+    const data = sessionStorage.getItem(USER_SESSION_KEY);
+    return data ? JSON.parse(data) : null;
+}
+
+// Logout user
+function logoutUser() {
+    sessionStorage.removeItem(USER_SESSION_KEY);
+}
+
+// ============ SESSIONS & BOOKINGS ============
 
 // Generate unique ID
 function generateId() {

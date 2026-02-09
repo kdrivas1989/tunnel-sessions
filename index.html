@@ -14,6 +14,18 @@
             <p class="tagline">Indoor Skydiving Experience</p>
         </header>
 
+        <!-- User Bar -->
+        <div id="user-bar" class="user-bar">
+            <div id="user-logged-out">
+                <button class="btn btn-small btn-outline" onclick="openLoginModal()">Login</button>
+                <button class="btn btn-small btn-primary" onclick="openRegisterModal()">Sign Up</button>
+            </div>
+            <div id="user-logged-in" class="hidden">
+                <span id="user-greeting"></span>
+                <button class="btn btn-small btn-outline" onclick="handleUserLogout()">Logout</button>
+            </div>
+        </div>
+
         <main>
             <section id="booking-section">
                 <h2>Available Sessions</h2>
@@ -23,7 +35,60 @@
                 <div id="sessions-list" class="sessions-grid"></div>
             </section>
 
-            <!-- Booking Modal -->
+            <!-- Login Modal -->
+            <div id="login-modal" class="modal hidden">
+                <div class="modal-content">
+                    <span class="close-btn">&times;</span>
+                    <h3>Login</h3>
+                    <form id="login-form">
+                        <div class="form-group">
+                            <label for="loginEmail">Email</label>
+                            <input type="email" id="loginEmail" required autocomplete="email">
+                        </div>
+                        <div class="form-group">
+                            <label for="loginPassword">Password</label>
+                            <input type="password" id="loginPassword" required autocomplete="current-password">
+                        </div>
+                        <p id="login-error" class="error-message hidden">Invalid email or password</p>
+                        <button type="submit" class="btn btn-primary btn-full">Login</button>
+                    </form>
+                    <p class="modal-switch">Don't have an account? <a href="#" onclick="switchToRegister()">Sign up</a></p>
+                </div>
+            </div>
+
+            <!-- Register Modal -->
+            <div id="register-modal" class="modal hidden">
+                <div class="modal-content">
+                    <span class="close-btn">&times;</span>
+                    <h3>Create Account</h3>
+                    <form id="register-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="regFirstName">First Name</label>
+                                <input type="text" id="regFirstName" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="regLastName">Last Name</label>
+                                <input type="text" id="regLastName" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="regEmail">Email</label>
+                            <input type="email" id="regEmail" required autocomplete="email">
+                        </div>
+                        <div class="form-group">
+                            <label for="regPassword">Password</label>
+                            <input type="password" id="regPassword" required minlength="6" autocomplete="new-password">
+                            <p class="field-hint">Minimum 6 characters</p>
+                        </div>
+                        <p id="register-error" class="error-message hidden"></p>
+                        <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+                    </form>
+                    <p class="modal-switch">Already have an account? <a href="#" onclick="switchToLogin()">Login</a></p>
+                </div>
+            </div>
+
+            <!-- Booking Modal (for guests) -->
             <div id="booking-modal" class="modal hidden">
                 <div class="modal-content">
                     <span class="close-btn">&times;</span>
@@ -40,6 +105,7 @@
                         </div>
                         <button type="submit" class="btn btn-primary">Confirm Booking</button>
                     </form>
+                    <p class="modal-switch">Have an account? <a href="#" onclick="switchToLoginFromBooking()">Login for quick booking</a></p>
                 </div>
             </div>
 
@@ -60,11 +126,31 @@
         </footer>
     </div>
 
-    <script src="app.js?v=2"></script>
+    <script src="app.js?v=3"></script>
     <script>
+        let selectedSessionId = null;
+
         document.addEventListener('DOMContentLoaded', () => {
+            updateUserBar();
             loadAvailableSessions();
         });
+
+        // Update user bar based on login status
+        function updateUserBar() {
+            const loggedOut = document.getElementById('user-logged-out');
+            const loggedIn = document.getElementById('user-logged-in');
+            const greeting = document.getElementById('user-greeting');
+
+            if (isUserLoggedIn()) {
+                const user = getCurrentUser();
+                greeting.textContent = `Hi, ${user.firstName}!`;
+                loggedOut.classList.add('hidden');
+                loggedIn.classList.remove('hidden');
+            } else {
+                loggedOut.classList.remove('hidden');
+                loggedIn.classList.add('hidden');
+            }
+        }
 
         function loadAvailableSessions() {
             const sessions = getSessions();
@@ -73,7 +159,6 @@
 
             sessionsContainer.innerHTML = '';
 
-            // Filter to only show sessions with available spots and in the future
             const now = new Date();
             const availableSessions = sessions.filter(session => {
                 const sessionDate = new Date(session.date + 'T' + session.time);
@@ -111,6 +196,12 @@
             const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
             const spotsLeft = session.capacity - session.bookings.length;
 
+            // Check if user is logged in for quick join
+            const isLoggedIn = isUserLoggedIn();
+            const buttonHtml = isLoggedIn
+                ? `<button class="btn btn-book btn-join" onclick="quickJoin('${session.id}')">Join</button>`
+                : `<button class="btn btn-book" onclick="openBookingModal('${session.id}')">Book Now</button>`;
+
             card.innerHTML = `
                 <div class="session-date">
                     <span class="session-type-badge">${session.sessionType || 'Session'}</span>
@@ -122,14 +213,145 @@
                     <span class="session-duration">${session.duration} minutes</span>
                     <span class="spots-left ${spotsLeft <= 1 ? 'low' : ''}">${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left</span>
                 </div>
-                <button class="btn btn-book" onclick="openBookingModal('${session.id}')">Book Now</button>
+                ${buttonHtml}
             `;
 
             return card;
         }
 
-        let selectedSessionId = null;
+        // Quick join for logged in users
+        function quickJoin(sessionId) {
+            const user = getCurrentUser();
+            if (!user) {
+                openLoginModal();
+                return;
+            }
 
+            const session = getSessionById(sessionId);
+            if (!session) return;
+
+            const success = addBooking(sessionId, user.firstName, user.lastName);
+
+            if (success) {
+                const date = new Date(session.date + 'T' + session.time);
+                const dateStr = date.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+                document.getElementById('success-message').innerHTML =
+                    `${user.firstName} ${user.lastName}, you're booked for<br><strong>${dateStr} at ${timeStr}</strong>`;
+                document.getElementById('success-modal').classList.remove('hidden');
+
+                loadAvailableSessions();
+            } else {
+                alert('Sorry, this session is now full. Please choose another time.');
+                loadAvailableSessions();
+            }
+        }
+
+        // Login Modal
+        function openLoginModal() {
+            document.getElementById('login-modal').classList.remove('hidden');
+            document.getElementById('loginEmail').focus();
+        }
+
+        document.querySelector('#login-modal .close-btn').addEventListener('click', () => {
+            document.getElementById('login-modal').classList.add('hidden');
+            document.getElementById('login-form').reset();
+            document.getElementById('login-error').classList.add('hidden');
+        });
+
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const errorEl = document.getElementById('login-error');
+
+            const user = verifyUser(email, password);
+
+            if (user) {
+                setUserLoggedIn(user);
+                document.getElementById('login-modal').classList.add('hidden');
+                document.getElementById('login-form').reset();
+                errorEl.classList.add('hidden');
+                updateUserBar();
+                loadAvailableSessions();
+            } else {
+                errorEl.classList.remove('hidden');
+            }
+        });
+
+        // Register Modal
+        function openRegisterModal() {
+            document.getElementById('register-modal').classList.remove('hidden');
+            document.getElementById('regFirstName').focus();
+        }
+
+        document.querySelector('#register-modal .close-btn').addEventListener('click', () => {
+            document.getElementById('register-modal').classList.add('hidden');
+            document.getElementById('register-form').reset();
+            document.getElementById('register-error').classList.add('hidden');
+        });
+
+        document.getElementById('register-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const firstName = document.getElementById('regFirstName').value.trim();
+            const lastName = document.getElementById('regLastName').value.trim();
+            const email = document.getElementById('regEmail').value.trim();
+            const password = document.getElementById('regPassword').value;
+            const errorEl = document.getElementById('register-error');
+
+            if (password.length < 6) {
+                errorEl.textContent = 'Password must be at least 6 characters';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            const result = createUser(firstName, lastName, email, password);
+
+            if (result.success) {
+                setUserLoggedIn(result.user);
+                document.getElementById('register-modal').classList.add('hidden');
+                document.getElementById('register-form').reset();
+                errorEl.classList.add('hidden');
+                updateUserBar();
+                loadAvailableSessions();
+            } else {
+                errorEl.textContent = result.error;
+                errorEl.classList.remove('hidden');
+            }
+        });
+
+        // Switch between modals
+        function switchToRegister() {
+            document.getElementById('login-modal').classList.add('hidden');
+            document.getElementById('login-form').reset();
+            openRegisterModal();
+        }
+
+        function switchToLogin() {
+            document.getElementById('register-modal').classList.add('hidden');
+            document.getElementById('register-form').reset();
+            openLoginModal();
+        }
+
+        function switchToLoginFromBooking() {
+            document.getElementById('booking-modal').classList.add('hidden');
+            document.getElementById('booking-form').reset();
+            openLoginModal();
+        }
+
+        // User logout
+        function handleUserLogout() {
+            logoutUser();
+            updateUserBar();
+            loadAvailableSessions();
+        }
+
+        // Booking Modal (for guests)
         function openBookingModal(sessionId) {
             selectedSessionId = sessionId;
             const session = getSessionById(sessionId);
@@ -207,9 +429,8 @@
         window.addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
                 e.target.classList.add('hidden');
-                if (e.target.id === 'booking-modal') {
-                    document.getElementById('booking-form').reset();
-                }
+                const forms = e.target.querySelectorAll('form');
+                forms.forEach(form => form.reset());
             }
         });
     </script>
