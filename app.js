@@ -111,12 +111,32 @@ function createUser(firstName, lastName, email, password) {
         lastName: lastName,
         email: email.toLowerCase(),
         passwordHash: hashPassword(password),
+        permissions: [], // Can include: 'secretary' (add/remove empty sessions)
         createdAt: new Date().toISOString()
     };
 
     users.push(newUser);
     saveUsers(users);
     return { success: true, user: newUser };
+}
+
+// Update user permissions
+function updateUserPermissions(userId, permissions) {
+    const users = getUsers();
+    const userIndex = users.findIndex(u => u.id === userId);
+    if (userIndex === -1) return false;
+
+    users[userIndex].permissions = permissions;
+    saveUsers(users);
+    return true;
+}
+
+// Check if user has permission
+function userHasPermission(userId, permission) {
+    const users = getUsers();
+    const user = users.find(u => u.id === userId);
+    if (!user) return false;
+    return user.permissions && user.permissions.includes(permission);
 }
 
 // Get user by email

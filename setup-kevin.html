@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Setup Kevin Account</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Setup Account</h1>
+        </header>
+        <main>
+            <section class="card">
+                <div id="status"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js?v=6"></script>
+    <script>
+        const email = 'kdrivas1989@gmail.com';
+        const password = '123456'; // Default password - should be changed
+
+        let statusHtml = '<h2>Setting up kdrivas1989@gmail.com...</h2><ul>';
+
+        // Add as host
+        const hostResult = createHost(email, password);
+        if (hostResult.success) {
+            statusHtml += '<li style="color: var(--success-color);">✓ Added as Host</li>';
+        } else {
+            statusHtml += `<li style="color: orange;">⚠ Host: ${hostResult.error}</li>`;
+        }
+
+        // Add as user
+        const userResult = createUser('Kevin', 'Drivas', email, password);
+        if (userResult.success) {
+            statusHtml += '<li style="color: var(--success-color);">✓ Added as User</li>';
+
+            // Give secretary permissions
+            updateUserPermissions(userResult.user.id, ['secretary']);
+            statusHtml += '<li style="color: var(--success-color);">✓ Granted Secretary permissions</li>';
+        } else {
+            statusHtml += `<li style="color: orange;">⚠ User: ${userResult.error}</li>`;
+
+            // If already exists, try to add permissions
+            const existingUser = getUserByEmail(email);
+            if (existingUser) {
+                updateUserPermissions(existingUser.id, ['secretary']);
+                statusHtml += '<li style="color: var(--success-color);">✓ Granted Secretary permissions to existing user</li>';
+            }
+        }
+
+        statusHtml += '</ul>';
+        statusHtml += '<p style="margin-top: 20px;"><strong>Default password:</strong> 123456 (please change after login)</p>';
+        statusHtml += '<p style="margin-top: 20px;"><a href="host.html" class="btn btn-primary">Go to Host Dashboard</a></p>';
+        statusHtml += '<p style="margin-top: 10px;"><a href="index.html" class="btn btn-outline">Go to Booking Page</a></p>';
+
+        document.getElementById('status').innerHTML = statusHtml;
+    </script>
+</body>
+</html>

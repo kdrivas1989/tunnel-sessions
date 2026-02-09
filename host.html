@@ -452,13 +452,21 @@
 
             let html = '<ul class="bookings-list">';
             users.forEach(user => {
+                const hasSecretary = user.permissions && user.permissions.includes('secretary');
+                const permissionBadge = hasSecretary
+                    ? '<span style="background: var(--secondary-color); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; margin-left: 8px;">Secretary</span>'
+                    : '';
+
                 html += `
                     <li style="flex-wrap: wrap; gap: 10px;">
                         <div>
-                            <strong>${user.firstName} ${user.lastName}</strong><br>
+                            <strong>${user.firstName} ${user.lastName}</strong>${permissionBadge}<br>
                             <span style="color: var(--text-secondary); font-size: 0.9rem;">${user.email}</span>
                         </div>
-                        <div style="display: flex; gap: 5px;">
+                        <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                            <button class="btn btn-small ${hasSecretary ? 'btn-danger' : 'btn-primary'}" onclick="toggleSecretaryPermission('${user.id}')">
+                                ${hasSecretary ? 'Remove Secretary' : 'Make Secretary'}
+                            </button>
                             <button class="btn btn-small btn-edit" onclick="resetUserPassword('${user.id}')">Reset Password</button>
                             <button class="btn-remove" onclick="removeUser('${user.id}')">Remove</button>
                         </div>
@@ -467,6 +475,24 @@
             });
             html += '</ul>';
             container.innerHTML = html;
+        }
+
+        // Toggle secretary permission
+        function toggleSecretaryPermission(userId) {
+            const users = getUsers();
+            const user = users.find(u => u.id === userId);
+            if (!user) return;
+
+            const currentPerms = user.permissions || [];
+            const hasSecretary = currentPerms.includes('secretary');
+
+            if (hasSecretary) {
+                updateUserPermissions(userId, currentPerms.filter(p => p !== 'secretary'));
+            } else {
+                updateUserPermissions(userId, [...currentPerms, 'secretary']);
+            }
+
+            loadUsers();
         }
 
         // Reset user password
