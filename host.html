@@ -123,6 +123,20 @@
                 </div>
             </section>
 
+            <!-- Settings Section -->
+            <section class="card">
+                <h2>Auto-Text Settings</h2>
+                <form id="settings-form">
+                    <div class="form-group">
+                        <label for="autoTextPhone">Phone Number for Daily Texts</label>
+                        <input type="tel" id="autoTextPhone" placeholder="e.g. 9784917053">
+                        <p class="field-hint">Texts sent daily at 12pm with participant lists</p>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                    <span id="settings-saved" class="success-message hidden" style="margin-left: 10px;">Saved!</span>
+                </form>
+            </section>
+
             <!-- Add Person Modal -->
             <div id="add-person-modal" class="modal hidden">
                 <div class="modal-content">
@@ -292,11 +306,34 @@
             document.getElementById('welcome-user').textContent = `Welcome, ${admin.username}`;
             showScreen(dashboardScreen);
             loadHostSessions();
+            loadSettings();
 
             // Set minimum date to today
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('sessionDate').min = today;
         }
+
+        // Settings
+        function loadSettings() {
+            const settings = JSON.parse(localStorage.getItem('tunnelSessionsSettings') || '{}');
+            document.getElementById('autoTextPhone').value = settings.autoTextPhone || '9784917053';
+        }
+
+        function saveSettings() {
+            const settings = {
+                autoTextPhone: document.getElementById('autoTextPhone').value.replace(/\D/g, '')
+            };
+            localStorage.setItem('tunnelSessionsSettings', JSON.stringify(settings));
+        }
+
+        document.getElementById('settings-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            saveSettings();
+            document.getElementById('settings-saved').classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('settings-saved').classList.add('hidden');
+            }, 2000);
+        });
 
         // Time picker based on date selection
         document.getElementById('sessionDate').addEventListener('change', updateTimeOptions);
