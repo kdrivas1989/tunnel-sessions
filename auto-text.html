@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Text - Tunnel Sessions</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="logo.svg" alt="Tunnel Sessions Logo" class="logo" style="width: 80px; height: 80px;">
+            <h1>Auto Text</h1>
+            <p class="tagline">Today's Session Participants</p>
+        </header>
+
+        <main>
+            <section class="card">
+                <div id="status"></div>
+                <div id="sessions-today"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js?v=4"></script>
+    <script>
+        const PHONE_NUMBER = '9784917053';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkTodaysSessions();
+        });
+
+        function checkTodaysSessions() {
+            const statusEl = document.getElementById('status');
+            const sessionsEl = document.getElementById('sessions-today');
+
+            const today = new Date().toISOString().split('T')[0];
+            const sessions = getSessions();
+
+            // Filter for today's sessions
+            const todaysSessions = sessions.filter(s => s.date === today && s.bookings.length > 0);
+
+            if (todaysSessions.length === 0) {
+                statusEl.innerHTML = '<p class="message">No sessions with participants today.</p>';
+                return;
+            }
+
+            statusEl.innerHTML = `<h2>Found ${todaysSessions.length} session(s) today</h2>`;
+
+            let html = '';
+            todaysSessions.forEach(session => {
+                const date = new Date(session.date + 'T' + session.time);
+                const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                const badgeClass = getSessionTypeClass(session.sessionType);
+
+                const names = session.bookings.map(b => `- ${b.firstName} ${b.lastName}`).join('\n');
+                const message = buildMessage(session);
+
+                html += `
+                    <div class="host-session-card" style="margin-bottom: 15px;">
+                        <div class="host-session-header">
+                            <div>
+                                <span class="session-type-badge ${badgeClass}">${session.sessionType}</span>
+                                <h3>${timeStr}</h3>
+                                <p>${session.bookings.length} participants</p>
+                            </div>
+                            <button class="btn btn-small btn-text" onclick="sendText('${session.id}')">Send Text</button>
+                        </div>
+                        <div class="bookings-container">
+                            <ul class="bookings-list">
+                                ${session.bookings.map(b => `<li><span>${b.firstName} ${b.lastName}</span></li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            });
+
+            sessionsEl.innerHTML = html;
+
+            // Auto-send option
+            if (todaysSessions.length > 0) {
+                const autoSendParam = new URLSearchParams(window.location.search).get('auto');
+                if (autoSendParam === 'true') {
+                    // Auto send all texts
+                    statusEl.innerHTML += '<p style="color: green; margin-top: 10px;">Auto-sending texts...</p>';
+                    todaysSessions.forEach((session, index) => {
+                        setTimeout(() => sendText(session.id), index * 2000);
+                    });
+                }
+            }
+        }
+
+        function buildMessage(session) {
+            const date = new Date(session.date + 'T' + session.time);
+            const dateStr = date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'short',
+                day: 'numeric'
+            });
+            const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+            return `${session.sessionType} - ${dateStr} at ${timeStr}\n\nParticipants:\n${session.bookings.map(b => `- ${b.firstName} ${b.lastName}`).join('\n')}`;
+        }
+
+        function sendText(sessionId) {
+            const session = getSessionById(sessionId);
+            if (!session) return;
+
+            const message = buildMessage(session);
+            const smsUrl = `sms:${PHONE_NUMBER}&body=${encodeURIComponent(message)}`;
+            window.open(smsUrl, '_blank');
+        }
+    </script>
+</body>
+</html>

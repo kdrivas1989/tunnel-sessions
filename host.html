@@ -167,6 +167,26 @@
                     </form>
                 </div>
             </div>
+
+            <!-- Edit Session Modal -->
+            <div id="edit-session-modal" class="modal hidden">
+                <div class="modal-content">
+                    <span class="close-btn">&times;</span>
+                    <h3>Edit Session</h3>
+                    <div id="edit-session-details"></div>
+                    <form id="edit-session-form">
+                        <div class="form-group">
+                            <label for="editSessionType">Session Type</label>
+                            <select id="editSessionType" required>
+                                <option value="ShredClub">ShredClub</option>
+                                <option value="Rookie Scrambles">Rookie Scrambles</option>
+                                <option value="Advanced Scrambles">Advanced Scrambles</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-full">Save Changes</button>
+                    </form>
+                </div>
+            </div>
         </main>
 
         <footer>
@@ -410,6 +430,10 @@
                 bookingsHtml = '<p class="no-bookings">No bookings yet</p>';
             }
 
+            const hasBookings = session.bookings.length > 0;
+            const textBtn = hasBookings && !isPast ? `<button class="btn btn-small btn-text" onclick="textParticipants('${session.id}')">Text List</button>` : '';
+            const editBtn = !isPast ? `<button class="btn btn-small btn-edit" onclick="openEditSessionModal('${session.id}')">Edit</button>` : '';
+
             card.innerHTML = `
                 <div class="host-session-header">
                     <div>
@@ -418,6 +442,8 @@
                         <p>${timeStr} - ${session.duration} min | ${session.bookings.length}/${session.capacity} booked</p>
                     </div>
                     <div class="session-actions">
+                        ${editBtn}
+                        ${textBtn}
                         ${!isPast ? `<button class="btn btn-small" onclick="openAddPersonModal('${session.id}')">Add Person</button>` : ''}
                         <button class="btn btn-small btn-danger" onclick="deleteSession('${session.id}')">Delete</button>
                     </div>
@@ -553,6 +579,78 @@
 
             deleteSessionById(sessionId);
             loadHostSessions();
+        }
+
+        // Edit Session Modal
+        let editingSessionId = null;
+
+        function openEditSessionModal(sessionId) {
+            editingSessionId = sessionId;
+            const session = getSessionById(sessionId);
+
+            if (!session) return;
+
+            const date = new Date(session.date + 'T' + session.time);
+            const dateStr = date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric'
+            });
+            const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+            document.getElementById('edit-session-details').innerHTML = `
+                <p><strong>${dateStr}</strong></p>
+                <p>${timeStr} - ${session.bookings.length} participant(s)</p>
+            `;
+
+            document.getElementById('editSessionType').value = session.sessionType || 'ShredClub';
+            document.getElementById('edit-session-modal').classList.remove('hidden');
+        }
+
+        document.querySelector('#edit-session-modal .close-btn').addEventListener('click', () => {
+            document.getElementById('edit-session-modal').classList.add('hidden');
+        });
+
+        document.getElementById('edit-session-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const newSessionType = document.getElementById('editSessionType').value;
+
+            if (editingSessionId && newSessionType) {
+                updateSession(editingSessionId, { sessionType: newSessionType });
+                document.getElementById('edit-session-modal').classList.add('hidden');
+                loadHostSessions();
+            }
+        });
+
+        // Text participants list
+        function textParticipants(sessionId) {
+            const session = getSessionById(sessionId);
+            if (!session || session.bookings.length === 0) {
+                alert('No participants to text');
+                return;
+            }
+
+            const date = new Date(session.date + 'T' + session.time);
+            const dateStr = date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'short',
+                day: 'numeric'
+            });
+            const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+            // Build participant list
+            const names = session.bookings.map(b => `${b.firstName} ${b.lastName}`).join(', ');
+
+            // Build message
+            const message = `${session.sessionType} - ${dateStr} at ${timeStr}\n\nParticipants:\n${session.bookings.map(b => `- ${b.firstName} ${b.lastName}`).join('\n')}`;
+
+            // Phone number
+            const phoneNumber = '9784917053';
+
+            // Open SMS
+            const smsUrl = `sms:${phoneNumber}&body=${encodeURIComponent(message)}`;
+            window.open(smsUrl, '_self');
         }
 
         // Close modal on outside click

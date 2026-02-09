@@ -276,6 +276,24 @@ section h2 {
     background: #b91c1c;
 }
 
+.btn-text {
+    background: #8b5cf6;
+    color: white;
+}
+
+.btn-text:hover {
+    background: #7c3aed;
+}
+
+.btn-edit {
+    background: #64748b;
+    color: white;
+}
+
+.btn-edit:hover {
+    background: #475569;
+}
+
 /* Forms */
 .form-group {
     margin-bottom: 15px;
