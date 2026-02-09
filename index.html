@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tunnel Sessions - Book Your Flight</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="logo.svg" alt="Tunnel Sessions Logo" class="logo">
+            <h1>Tunnel Sessions</h1>
+            <p class="tagline">Indoor Skydiving Experience</p>
+        </header>
+
+        <main>
+            <section id="booking-section">
+                <h2>Available Sessions</h2>
+                <div id="no-sessions" class="message hidden">
+                    <p>No sessions available at this time. Please check back later!</p>
+                </div>
+                <div id="sessions-list" class="sessions-grid"></div>
+            </section>
+
+            <!-- Booking Modal -->
+            <div id="booking-modal" class="modal hidden">
+                <div class="modal-content">
+                    <span class="close-btn">&times;</span>
+                    <h3>Book Your Spot</h3>
+                    <div id="session-details"></div>
+                    <form id="booking-form">
+                        <div class="form-group">
+                            <label for="firstName">First Name</label>
+                            <input type="text" id="firstName" name="firstName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="lastName">Last Name</label>
+                            <input type="text" id="lastName" name="lastName" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Confirm Booking</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Success Modal -->
+            <div id="success-modal" class="modal hidden">
+                <div class="modal-content success">
+                    <span class="close-btn">&times;</span>
+                    <div class="success-icon">&#10003;</div>
+                    <h3>Booking Confirmed!</h3>
+                    <p id="success-message"></p>
+                    <button class="btn btn-primary" onclick="closeSuccessModal()">Done</button>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <a href="host.html" class="host-link">Host Login</a>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAvailableSessions();
+        });
+
+        function loadAvailableSessions() {
+            const sessions = getSessions();
+            const sessionsContainer = document.getElementById('sessions-list');
+            const noSessionsMsg = document.getElementById('no-sessions');
+
+            sessionsContainer.innerHTML = '';
+
+            // Filter to only show sessions with available spots and in the future
+            const now = new Date();
+            const availableSessions = sessions.filter(session => {
+                const sessionDate = new Date(session.date + 'T' + session.time);
+                return sessionDate > now && session.bookings.length < session.capacity;
+            });
+
+            if (availableSessions.length === 0) {
+                noSessionsMsg.classList.remove('hidden');
+                sessionsContainer.classList.add('hidden');
+                return;
+            }
+
+            noSessionsMsg.classList.add('hidden');
+            sessionsContainer.classList.remove('hidden');
+
+            availableSessions.sort((a, b) => {
+                const dateA = new Date(a.date + 'T' + a.time);
+                const dateB = new Date(b.date + 'T' + b.time);
+                return dateA - dateB;
+            });
+
+            availableSessions.forEach(session => {
+                const card = createSessionCard(session);
+                sessionsContainer.appendChild(card);
+            });
+        }
+
+        function createSessionCard(session) {
+            const card = document.createElement('div');
+            card.className = 'session-card';
+
+            const date = new Date(session.date + 'T' + session.time);
+            const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+            const monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const spotsLeft = session.capacity - session.bookings.length;
+
+            card.innerHTML = `
+                <div class="session-date">
+                    <span class="day-name">${dayName}</span>
+                    <span class="month-day">${monthDay}</span>
+                </div>
+                <div class="session-info">
+                    <span class="session-time">${timeStr}</span>
+                    <span class="session-duration">${session.duration} minutes</span>
+                    <span class="spots-left ${spotsLeft <= 1 ? 'low' : ''}">${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left</span>
+                </div>
+                <button class="btn btn-book" onclick="openBookingModal('${session.id}')">Book Now</button>
+            `;
+
+            return card;
+        }
+
+        let selectedSessionId = null;
+
+        function openBookingModal(sessionId) {
+            selectedSessionId = sessionId;
+            const session = getSessionById(sessionId);
+
+            if (!session) return;
+
+            const date = new Date(session.date + 'T' + session.time);
+            const dateStr = date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+            });
+            const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+            document.getElementById('session-details').innerHTML = `
+                <p><strong>${dateStr}</strong></p>
+                <p>${timeStr} - ${session.duration} minutes</p>
+            `;
+
+            document.getElementById('booking-modal').classList.remove('hidden');
+            document.getElementById('firstName').focus();
+        }
+
+        document.querySelector('#booking-modal .close-btn').addEventListener('click', () => {
+            document.getElementById('booking-modal').classList.add('hidden');
+            document.getElementById('booking-form').reset();
+        });
+
+        document.getElementById('booking-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const firstName = document.getElementById('firstName').value.trim();
+            const lastName = document.getElementById('lastName').value.trim();
+
+            if (!firstName || !lastName) {
+                alert('Please enter your first and last name');
+                return;
+            }
+
+            const success = addBooking(selectedSessionId, firstName, lastName);
+
+            if (success) {
+                document.getElementById('booking-modal').classList.add('hidden');
+                document.getElementById('booking-form').reset();
+
+                const session = getSessionById(selectedSessionId);
+                const date = new Date(session.date + 'T' + session.time);
+                const dateStr = date.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+                document.getElementById('success-message').innerHTML =
+                    `${firstName} ${lastName}, you're booked for<br><strong>${dateStr} at ${timeStr}</strong>`;
+                document.getElementById('success-modal').classList.remove('hidden');
+
+                loadAvailableSessions();
+            } else {
+                alert('Sorry, this session is now full. Please choose another time.');
+                loadAvailableSessions();
+            }
+        });
+
+        function closeSuccessModal() {
+            document.getElementById('success-modal').classList.add('hidden');
+        }
+
+        document.querySelector('#success-modal .close-btn').addEventListener('click', closeSuccessModal);
+
+        // Close modals when clicking outside
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.classList.add('hidden');
+                if (e.target.id === 'booking-modal') {
+                    document.getElementById('booking-form').reset();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tunnel Sessions - Host Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="logo.svg" alt="Tunnel Sessions Logo" class="logo">
+            <h1>Host Dashboard</h1>
+            <p class="tagline">Manage Your Sessions</p>
+        </header>
+
+        <main class="host-main">
+            <!-- Create Session Section -->
+            <section class="card">
+                <h2>Create New Session</h2>
+                <form id="create-session-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="sessionDay">Day of Week</label>
+                            <select id="sessionDay" required>
+                                <option value="">Select a day</option>
+                                <option value="0">Sunday</option>
+                                <option value="1">Monday</option>
+                                <option value="2">Tuesday</option>
+                                <option value="3">Wednesday</option>
+                                <option value="4">Thursday</option>
+                                <option value="5">Friday</option>
+                                <option value="6">Saturday</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="sessionTime">Time</label>
+                            <input type="time" id="sessionTime" value="19:00" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="sessionDuration">Duration (minutes)</label>
+                            <input type="number" id="sessionDuration" value="60" min="15" max="180" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="sessionCapacity">Capacity (people)</label>
+                            <input type="number" id="sessionCapacity" value="4" min="1" max="20" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="repeatWeeks">Repeat for X weeks</label>
+                            <input type="number" id="repeatWeeks" value="1" min="1" max="52" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create Session(s)</button>
+                </form>
+            </section>
+
+            <!-- Manage Sessions Section -->
+            <section class="card">
+                <h2>Manage Sessions</h2>
+                <div id="host-sessions-list" class="host-sessions"></div>
+                <div id="no-host-sessions" class="message hidden">
+                    <p>No sessions created yet. Create your first session above!</p>
+                </div>
+            </section>
+
+            <!-- Add Person Modal -->
+            <div id="add-person-modal" class="modal hidden">
+                <div class="modal-content">
+                    <span class="close-btn">&times;</span>
+                    <h3>Add Person to Session</h3>
+                    <div id="add-session-details"></div>
+                    <form id="add-person-form">
+                        <div class="form-group">
+                            <label for="addFirstName">First Name</label>
+                            <input type="text" id="addFirstName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="addLastName">Last Name</label>
+                            <input type="text" id="addLastName" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add Person</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <a href="index.html" class="host-link">Back to Booking Page</a>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHostSessions();
+        });
+
+        function loadHostSessions() {
+            const sessions = getSessions();
+            const container = document.getElementById('host-sessions-list');
+            const noSessionsMsg = document.getElementById('no-host-sessions');
+
+            container.innerHTML = '';
+
+            if (sessions.length === 0) {
+                noSessionsMsg.classList.remove('hidden');
+                container.classList.add('hidden');
+                return;
+            }
+
+            noSessionsMsg.classList.add('hidden');
+            container.classList.remove('hidden');
+
+            // Sort by date
+            sessions.sort((a, b) => {
+                const dateA = new Date(a.date + 'T' + a.time);
+                const dateB = new Date(b.date + 'T' + b.time);
+                return dateA - dateB;
+            });
+
+            sessions.forEach(session => {
+                const card = createHostSessionCard(session);
+                container.appendChild(card);
+            });
+        }
+
+        function createHostSessionCard(session) {
+            const card = document.createElement('div');
+            card.className = 'host-session-card';
+
+            const date = new Date(session.date + 'T' + session.time);
+            const now = new Date();
+            const isPast = date < now;
+
+            if (isPast) {
+                card.classList.add('past');
+            }
+
+            const dateStr = date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+            const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+            let bookingsHtml = '';
+            if (session.bookings.length > 0) {
+                bookingsHtml = '<ul class="bookings-list">';
+                session.bookings.forEach((booking, index) => {
+                    bookingsHtml += `
+                        <li>
+                            <span>${booking.firstName} ${booking.lastName}</span>
+                            <button class="btn-remove" onclick="removeBooking('${session.id}', ${index})" title="Remove">&#10005;</button>
+                        </li>
+                    `;
+                });
+                bookingsHtml += '</ul>';
+            } else {
+                bookingsHtml = '<p class="no-bookings">No bookings yet</p>';
+            }
+
+            card.innerHTML = `
+                <div class="host-session-header">
+                    <div>
+                        <h3>${dateStr}</h3>
+                        <p>${timeStr} - ${session.duration} min | ${session.bookings.length}/${session.capacity} booked</p>
+                    </div>
+                    <div class="session-actions">
+                        ${!isPast ? `<button class="btn btn-small" onclick="openAddPersonModal('${session.id}')">Add Person</button>` : ''}
+                        <button class="btn btn-small btn-danger" onclick="deleteSession('${session.id}')">Delete</button>
+                    </div>
+                </div>
+                <div class="bookings-container">
+                    <h4>Bookings:</h4>
+                    ${bookingsHtml}
+                </div>
+            `;
+
+            return card;
+        }
+
+        // Create Session Form
+        document.getElementById('create-session-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const dayOfWeek = parseInt(document.getElementById('sessionDay').value);
+            const time = document.getElementById('sessionTime').value;
+            const duration = parseInt(document.getElementById('sessionDuration').value);
+            const capacity = parseInt(document.getElementById('sessionCapacity').value);
+            const repeatWeeks = parseInt(document.getElementById('repeatWeeks').value);
+
+            // Find the next occurrence of the selected day
+            const today = new Date();
+            let nextDate = new Date(today);
+
+            // Calculate days until the next occurrence
+            const currentDay = today.getDay();
+            let daysUntil = dayOfWeek - currentDay;
+            if (daysUntil <= 0) {
+                daysUntil += 7;
+            }
+            nextDate.setDate(today.getDate() + daysUntil);
+
+            // Create sessions for each week
+            for (let i = 0; i < repeatWeeks; i++) {
+                const sessionDate = new Date(nextDate);
+                sessionDate.setDate(nextDate.getDate() + (i * 7));
+
+                const dateStr = sessionDate.toISOString().split('T')[0];
+
+                createSession({
+                    date: dateStr,
+                    time: time,
+                    duration: duration,
+                    capacity: capacity
+                });
+            }
+
+            alert(`Created ${repeatWeeks} session(s)!`);
+            document.getElementById('create-session-form').reset();
+            document.getElementById('sessionTime').value = '19:00';
+            document.getElementById('sessionDuration').value = '60';
+            document.getElementById('sessionCapacity').value = '4';
+            document.getElementById('repeatWeeks').value = '1';
+            loadHostSessions();
+        });
+
+        // Add Person Modal
+        let selectedHostSessionId = null;
+
+        function openAddPersonModal(sessionId) {
+            selectedHostSessionId = sessionId;
+            const session = getSessionById(sessionId);
+
+            if (!session) return;
+
+            if (session.bookings.length >= session.capacity) {
+                alert('This session is already full!');
+                return;
+            }
+
+            const date = new Date(session.date + 'T' + session.time);
+            const dateStr = date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric'
+            });
+            const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+            document.getElementById('add-session-details').innerHTML = `
+                <p><strong>${dateStr}</strong></p>
+                <p>${timeStr} - ${session.bookings.length}/${session.capacity} booked</p>
+            `;
+
+            document.getElementById('add-person-modal').classList.remove('hidden');
+            document.getElementById('addFirstName').focus();
+        }
+
+        document.querySelector('#add-person-modal .close-btn').addEventListener('click', () => {
+            document.getElementById('add-person-modal').classList.add('hidden');
+            document.getElementById('add-person-form').reset();
+        });
+
+        document.getElementById('add-person-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const firstName = document.getElementById('addFirstName').value.trim();
+            const lastName = document.getElementById('addLastName').value.trim();
+
+            if (!firstName || !lastName) {
+                alert('Please enter first and last name');
+                return;
+            }
+
+            const success = addBooking(selectedHostSessionId, firstName, lastName);
+
+            if (success) {
+                document.getElementById('add-person-modal').classList.add('hidden');
+                document.getElementById('add-person-form').reset();
+                loadHostSessions();
+            } else {
+                alert('Could not add person. Session may be full.');
+            }
+        });
+
+        function removeBooking(sessionId, bookingIndex) {
+            if (confirm('Remove this person from the session?')) {
+                removeBookingFromSession(sessionId, bookingIndex);
+                loadHostSessions();
+            }
+        }
+
+        function deleteSession(sessionId) {
+            const session = getSessionById(sessionId);
+            if (session && session.bookings.length > 0) {
+                if (!confirm('This session has bookings. Are you sure you want to delete it?')) {
+                    return;
+                }
+            } else if (!confirm('Delete this session?')) {
+                return;
+            }
+
+            deleteSessionById(sessionId);
+            loadHostSessions();
+        }
+
+        // Close modal on outside click
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.classList.add('hidden');
+                document.getElementById('add-person-form').reset();
+            }
+        });
+    </script>
+</body>
+</html>
