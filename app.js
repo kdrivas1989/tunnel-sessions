@@ -6,6 +6,7 @@ const ADMIN_KEY = 'tunnelSessionsAdmin';
 const SESSION_KEY = 'tunnelSessionsLoggedIn';
 const USERS_KEY = 'tunnelSessionsUsers';
 const USER_SESSION_KEY = 'tunnelSessionsCurrentUser';
+const HOSTS_KEY = 'tunnelSessionsHosts';
 
 // ============ ADMIN AUTHENTICATION ============
 
@@ -160,6 +161,60 @@ function getCurrentUser() {
 // Logout user
 function logoutUser() {
     sessionStorage.removeItem(USER_SESSION_KEY);
+}
+
+// ============ HOST AUTHENTICATION ============
+
+// Get all hosts
+function getHosts() {
+    const data = localStorage.getItem(HOSTS_KEY);
+    return data ? JSON.parse(data) : [];
+}
+
+// Save hosts
+function saveHosts(hosts) {
+    localStorage.setItem(HOSTS_KEY, JSON.stringify(hosts));
+}
+
+// Create host account (admin only)
+function createHost(email, password) {
+    const hosts = getHosts();
+
+    // Check if email already exists
+    if (hosts.some(h => h.email.toLowerCase() === email.toLowerCase())) {
+        return { success: false, error: 'Email already registered as host' };
+    }
+
+    const newHost = {
+        id: generateId(),
+        email: email.toLowerCase(),
+        passwordHash: hashPassword(password),
+        createdAt: new Date().toISOString()
+    };
+
+    hosts.push(newHost);
+    saveHosts(hosts);
+    return { success: true, host: newHost };
+}
+
+// Verify host login
+function verifyHost(email, password) {
+    const hosts = getHosts();
+    const host = hosts.find(h => h.email.toLowerCase() === email.toLowerCase());
+    if (!host) return null;
+
+    const hashedPassword = hashPassword(password);
+    if (host.passwordHash === hashedPassword) {
+        return host;
+    }
+    return null;
+}
+
+// Delete host account
+function deleteHost(hostId) {
+    let hosts = getHosts();
+    hosts = hosts.filter(h => h.id !== hostId);
+    saveHosts(hosts);
 }
 
 // ============ SESSIONS & BOOKINGS ============

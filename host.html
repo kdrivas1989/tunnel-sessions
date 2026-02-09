@@ -137,6 +137,27 @@
                 </form>
             </section>
 
+            <!-- Host Management Section (Admin Only) -->
+            <section id="host-management" class="card hidden">
+                <h2>Manage Hosts (Admin Only)</h2>
+                <form id="create-host-form" style="margin-bottom: 20px;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="newHostEmail">Host Email</label>
+                            <input type="email" id="newHostEmail" required placeholder="host@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="newHostPassword">Password</label>
+                            <input type="password" id="newHostPassword" required minlength="6" placeholder="Min 6 characters">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Host</button>
+                    <span id="host-created" class="success-message hidden" style="margin-left: 10px;">Host created!</span>
+                    <span id="host-error" class="error-message hidden" style="margin-left: 10px;"></span>
+                </form>
+                <div id="hosts-list"></div>
+            </section>
+
             <!-- Add Person Modal -->
             <div id="add-person-modal" class="modal hidden">
                 <div class="modal-content">
@@ -275,21 +296,27 @@
             }
         });
 
-        // Login form - accepts admin OR registered user with host access
+        // Login form - accepts host OR admin
         document.getElementById('login-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const email = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value;
             const errorEl = document.getElementById('login-error');
 
-            // Try admin login first
-            let valid = verifyAdmin(email, password);
+            // Try host login first
+            let valid = false;
+            const host = verifyHost(email, password);
+            if (host) {
+                valid = true;
+                sessionStorage.setItem('hostRole', 'host');
+            }
 
-            // If not admin, try as registered user (all users can be hosts)
+            // If not host, try admin login
             if (!valid) {
-                const user = verifyUser(email, password);
-                if (user) {
+                const isAdmin = verifyAdmin(email, password);
+                if (isAdmin) {
                     valid = true;
+                    sessionStorage.setItem('hostRole', 'admin');
                 }
             }
 
@@ -305,14 +332,25 @@
         // Logout
         function handleLogout() {
             logout();
+            sessionStorage.removeItem('hostRole');
             showScreen(loginScreen);
             document.getElementById('login-form').reset();
         }
 
         // Show dashboard
         function showDashboard() {
+            const role = sessionStorage.getItem('hostRole') || 'host';
             const admin = getAdmin();
-            document.getElementById('welcome-user').textContent = `Welcome, ${admin.username}`;
+
+            if (role === 'admin' && admin) {
+                document.getElementById('welcome-user').textContent = `Welcome, ${admin.username} (Admin)`;
+                document.getElementById('host-management').classList.remove('hidden');
+                loadHosts();
+            } else {
+                document.getElementById('welcome-user').textContent = `Welcome, Host`;
+                document.getElementById('host-management').classList.add('hidden');
+            }
+
             showScreen(dashboardScreen);
             loadHostSessions();
             loadSettings();
@@ -321,6 +359,67 @@
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('sessionDate').min = today;
         }
+
+        // Load and display hosts (admin only)
+        function loadHosts() {
+            const hosts = getHosts();
+            const container = document.getElementById('hosts-list');
+
+            if (hosts.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary);">No hosts created yet.</p>';
+                return;
+            }
+
+            let html = '<ul class="bookings-list">';
+            hosts.forEach(host => {
+                html += `
+                    <li>
+                        <span>${host.email}</span>
+                        <button class="btn-remove" onclick="removeHost('${host.id}')">Remove</button>
+                    </li>
+                `;
+            });
+            html += '</ul>';
+            container.innerHTML = html;
+        }
+
+        // Remove host
+        function removeHost(hostId) {
+            if (confirm('Are you sure you want to remove this host?')) {
+                deleteHost(hostId);
+                loadHosts();
+            }
+        }
+
+        // Create host form
+        document.getElementById('create-host-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('newHostEmail').value.trim();
+            const password = document.getElementById('newHostPassword').value;
+            const successEl = document.getElementById('host-created');
+            const errorEl = document.getElementById('host-error');
+
+            successEl.classList.add('hidden');
+            errorEl.classList.add('hidden');
+
+            if (password.length < 6) {
+                errorEl.textContent = 'Password must be at least 6 characters';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            const result = createHost(email, password);
+
+            if (result.success) {
+                successEl.classList.remove('hidden');
+                document.getElementById('create-host-form').reset();
+                loadHosts();
+                setTimeout(() => successEl.classList.add('hidden'), 2000);
+            } else {
+                errorEl.textContent = result.error;
+                errorEl.classList.remove('hidden');
+            }
+        });
 
         // Settings
         function loadSettings() {
