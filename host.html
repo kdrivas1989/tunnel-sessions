@@ -46,6 +46,7 @@
                     <div class="form-group">
                         <label for="setupPassword">Password</label>
                         <input type="password" id="setupPassword" required minlength="6" autocomplete="new-password">
+                        <p class="field-hint">Minimum 6 characters</p>
                     </div>
                     <div class="form-group">
                         <label for="setupPasswordConfirm">Confirm Password</label>
@@ -207,7 +208,7 @@
         });
 
         // Setup form
-        document.getElementById('setup-form').addEventListener('submit', async (e) => {
+        document.getElementById('setup-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const username = document.getElementById('setupUsername').value.trim();
             const password = document.getElementById('setupPassword').value;
@@ -226,19 +227,19 @@
                 return;
             }
 
-            await createAdmin(username, password);
+            createAdmin(username, password);
             setLoggedIn();
             showDashboard();
         });
 
         // Login form
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
+        document.getElementById('login-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const username = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value;
             const errorEl = document.getElementById('login-error');
 
-            const valid = await verifyAdmin(username, password);
+            const valid = verifyAdmin(username, password);
 
             if (valid) {
                 errorEl.classList.add('hidden');
@@ -502,7 +503,7 @@
             document.getElementById('change-password-success').classList.add('hidden');
         });
 
-        document.getElementById('change-password-form').addEventListener('submit', async (e) => {
+        document.getElementById('change-password-form').addEventListener('submit', (e) => {
             e.preventDefault();
 
             const currentPassword = document.getElementById('currentPassword').value;
@@ -526,7 +527,7 @@
                 return;
             }
 
-            const success = await changePassword(currentPassword, newPassword);
+            const success = changePassword(currentPassword, newPassword);
 
             if (success) {
                 successEl.classList.remove('hidden');

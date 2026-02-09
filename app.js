@@ -7,13 +7,17 @@ const SESSION_KEY = 'tunnelSessionsLoggedIn';
 
 // ============ ADMIN AUTHENTICATION ============
 
-// Simple hash function for password (not cryptographically secure, but fine for basic protection)
-async function hashPassword(password) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password + 'tunnelSalt2024');
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+// Simple hash function for password (works on both HTTP and HTTPS)
+function hashPassword(password) {
+    const str = password + 'tunnelSalt2024';
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    // Convert to positive hex string
+    return Math.abs(hash).toString(16) + str.length.toString(16);
 }
 
 // Check if admin account exists
@@ -28,8 +32,8 @@ function getAdmin() {
 }
 
 // Create admin account
-async function createAdmin(username, password) {
-    const hashedPassword = await hashPassword(password);
+function createAdmin(username, password) {
+    const hashedPassword = hashPassword(password);
     const admin = {
         username: username,
         passwordHash: hashedPassword,
@@ -40,11 +44,11 @@ async function createAdmin(username, password) {
 }
 
 // Verify admin login
-async function verifyAdmin(username, password) {
+function verifyAdmin(username, password) {
     const admin = getAdmin();
     if (!admin) return false;
 
-    const hashedPassword = await hashPassword(password);
+    const hashedPassword = hashPassword(password);
     return admin.username === username && admin.passwordHash === hashedPassword;
 }
 
@@ -64,14 +68,14 @@ function logout() {
 }
 
 // Change password
-async function changePassword(currentPassword, newPassword) {
+function changePassword(currentPassword, newPassword) {
     const admin = getAdmin();
     if (!admin) return false;
 
-    const currentHash = await hashPassword(currentPassword);
+    const currentHash = hashPassword(currentPassword);
     if (admin.passwordHash !== currentHash) return false;
 
-    admin.passwordHash = await hashPassword(newPassword);
+    admin.passwordHash = hashPassword(newPassword);
     localStorage.setItem(ADMIN_KEY, JSON.stringify(admin));
     return true;
 }
