@@ -20,36 +20,9 @@
     <script src="app.js?v=5"></script>
     <script>
         // February 2026 ShredClub sessions from SignUpGenius with participants
-        // Notes that are names become separate bookings
+        // Updated from screenshots on 02/10/2026
+        // Large name = participant, small text = notes
         const sessionsToImport = [
-            // February 4, 2026 (Wednesday)
-            {
-                date: '2026-02-04', time: '19:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
-                bookings: [
-                    { firstName: 'Chris', lastName: 'Mangano', notes: '' },
-                    { firstName: 'Isley', lastName: 'Boyarski', notes: '' },
-                    { firstName: 'Brendan C', lastName: 'Conway', notes: 'Stability Drills' },
-                    { firstName: 'Ed', lastName: 'Laird', notes: '' }
-                ]
-            },
-            {
-                date: '2026-02-04', time: '20:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
-                bookings: [
-                    { firstName: 'Bodhi', lastName: 'Wilkins', notes: '' },
-                    { firstName: 'Nick', lastName: 'Larrabee', notes: '' },
-                    { firstName: 'Dianne', lastName: 'Cucufate', notes: '' }
-                ]
-            },
-            {
-                date: '2026-02-04', time: '21:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
-                bookings: [
-                    { firstName: 'Dmitri', lastName: 'Kazarlyga', notes: '' },
-                    { firstName: 'Vladislav', lastName: 'Shashkin', notes: '' },
-                    { firstName: 'Dianne', lastName: 'Cucufate', notes: '' },
-                    { firstName: 'Ethan', lastName: 'Apter', notes: '' }
-                ]
-            },
-
             // February 11, 2026 (Wednesday)
             {
                 date: '2026-02-11', time: '19:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
@@ -57,24 +30,22 @@
                     { firstName: 'Chris', lastName: 'Mangano', notes: '' },
                     { firstName: 'Isley', lastName: 'Boyarski', notes: '' },
                     { firstName: 'Ed', lastName: 'Laird', notes: '' },
-                    { firstName: 'Paul', lastName: 'Dirnd', notes: '' }
+                    { firstName: 'Paul', lastName: 'Dimnd', notes: '' }
                 ]
             },
             {
                 date: '2026-02-11', time: '20:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
                 bookings: [
-                    { firstName: 'Side', lastName: 'Caesar', notes: '' },
-                    { firstName: 'Devin', lastName: 'Murray', notes: '2 way VFS' },
+                    { firstName: 'Bodhi', lastName: 'Wilkins', notes: 'Bodhi Wilkins' },
+                    { firstName: 'Bodhi', lastName: 'Wilkins', notes: 'Nick Larrabee' },
                     { firstName: 'Brendan', lastName: 'Conway', notes: '' },
-                    { firstName: 'Dianne', lastName: 'Cucufate', notes: '' },
-                    { firstName: 'Alyssa', lastName: '', notes: '' }
+                    { firstName: 'Dianne', lastName: 'Cucufate', notes: 'Alyssa' }
                 ]
             },
             {
                 date: '2026-02-11', time: '21:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
                 bookings: [
-                    { firstName: 'Dianne', lastName: 'Cucufate', notes: '' },
-                    { firstName: 'Alyssa', lastName: '', notes: '' },
+                    { firstName: 'Dianne', lastName: 'Cucufate', notes: 'Alyssa' },
                     { firstName: 'Dmitri', lastName: 'Kazarlyga', notes: '' },
                     { firstName: 'Vladislav', lastName: 'Shashkin', notes: '' },
                     { firstName: 'Gabriel', lastName: 'Leonard', notes: '' }
@@ -88,25 +59,14 @@
                     { firstName: 'Chris', lastName: 'Mangano', notes: '' },
                     { firstName: 'Jon', lastName: 'Mortison', notes: 'Back Fly' },
                     { firstName: 'Ed', lastName: 'Laird', notes: '' },
-                    { firstName: 'Dianne', lastName: 'Cucufate', notes: '' },
-                    { firstName: 'Alyssa', lastName: '', notes: '' },
-                    { firstName: 'Robbie', lastName: '', notes: '' },
-                    { firstName: 'Erin', lastName: '', notes: '' }
+                    { firstName: 'Dianne', lastName: 'Cucufate', notes: 'Alyssa, Robbie, Erin' }
                 ]
             },
             {
                 date: '2026-02-18', time: '20:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
                 bookings: [
-                    { firstName: 'Side', lastName: 'Caesar', notes: '' },
-                    { firstName: 'Dianne', lastName: 'Cucufate', notes: '' },
-                    { firstName: 'Alyssa', lastName: '', notes: '' },
-                    { firstName: 'Robbie', lastName: '', notes: '' },
-                    { firstName: 'Erin', lastName: '', notes: '' }
+                    { firstName: 'Dianne', lastName: 'Cucufate', notes: 'Alyssa, Robbie, Erin' }
                 ]
-            },
-            {
-                date: '2026-02-18', time: '21:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
-                bookings: []
             },
 
             // February 25, 2026 (Wednesday)
@@ -125,13 +85,13 @@
                     { firstName: 'Side', lastName: 'Caesar', notes: '' }
                 ]
             },
-            {
-                date: '2026-02-25', time: '21:00', sessionType: 'ShredClub', duration: 60, capacity: 4,
-                bookings: []
-            },
         ];
 
-        let statusHtml = '<h2>Importing February ShredClub Sessions...</h2><ul>';
+        // Clear all existing sessions first
+        saveSessions([]);
+
+        let statusHtml = '<h2>Importing February ShredClub Sessions...</h2>';
+        statusHtml += '<p style="color: var(--success-color);">✓ Cleared all existing sessions</p><ul>';
         let sessionsCreated = 0;
         let sessionsSkipped = 0;
         let bookingsAdded = 0;

@@ -3,7 +3,7 @@
 # Tunnel Sessions - Automatic Daily Text Script
 # Sends texts at 12pm to ALL configured phone numbers with all sessions for the day
 
-open -a Safari "http://booking.kd-evolution.com/auto-text.html"
+open -a Safari "http://localhost:8080/auto-text.html"
 sleep 4
 
 osascript << 'EOF'

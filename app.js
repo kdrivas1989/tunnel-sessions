@@ -7,6 +7,7 @@ const SESSION_KEY = 'tunnelSessionsLoggedIn';
 const USERS_KEY = 'tunnelSessionsUsers';
 const USER_SESSION_KEY = 'tunnelSessionsCurrentUser';
 const HOSTS_KEY = 'tunnelSessionsHosts';
+const FAVORITES_KEY = 'tunnelSessionsFavorites';
 
 // ============ ADMIN AUTHENTICATION ============
 
@@ -183,6 +184,49 @@ function logoutUser() {
     localStorage.removeItem(USER_SESSION_KEY);
 }
 
+// ============ USER FAVORITES ============
+
+// Get all favorites (keyed by user ID)
+function getAllFavorites() {
+    const data = localStorage.getItem(FAVORITES_KEY);
+    return data ? JSON.parse(data) : {};
+}
+
+// Get favorites for current user
+function getUserFavorites() {
+    const user = getCurrentUser();
+    if (!user) return [];
+    const allFavorites = getAllFavorites();
+    return allFavorites[user.id] || [];
+}
+
+// Check if session is favorited by current user
+function isSessionFavorited(sessionId) {
+    const favorites = getUserFavorites();
+    return favorites.includes(sessionId);
+}
+
+// Toggle favorite for a session
+function toggleFavorite(sessionId) {
+    const user = getCurrentUser();
+    if (!user) return false;
+
+    const allFavorites = getAllFavorites();
+    if (!allFavorites[user.id]) {
+        allFavorites[user.id] = [];
+    }
+
+    const index = allFavorites[user.id].indexOf(sessionId);
+    if (index === -1) {
+        allFavorites[user.id].push(sessionId);
+    } else {
+        allFavorites[user.id].splice(index, 1);
+    }
+
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(allFavorites));
+    return index === -1; // Returns true if now favorited
+}
+
 // ============ HOST AUTHENTICATION ============
 
 // Get all hosts
@@ -254,6 +298,68 @@ function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
+// Generate cancellation token for guest bookings
+function generateCancellationToken() {
+    return 'cancel_' + Date.now().toString(36) + Math.random().toString(36).substr(2) + Math.random().toString(36).substr(2);
+}
+
+// Get booking by cancellation token
+function getBookingByToken(token) {
+    const sessions = getSessions();
+    for (const session of sessions) {
+        for (let i = 0; i < session.bookings.length; i++) {
+            if (session.bookings[i].cancellationToken === token) {
+                return { session, booking: session.bookings[i], bookingIndex: i };
+            }
+        }
+    }
+    return null;
+}
+
+// Cancel booking by token (for guests)
+function cancelBookingByToken(token) {
+    const result = getBookingByToken(token);
+    if (!result) {
+        return { success: false, error: 'Booking not found or already cancelled' };
+    }
+
+    const { session, booking, bookingIndex } = result;
+    const sessionDateTime = new Date(session.date + 'T' + session.time);
+    const now = new Date();
+    const hoursUntilSession = (sessionDateTime - now) / (1000 * 60 * 60);
+
+    // Check if session is in the past
+    if (hoursUntilSession < 0) {
+        return { success: false, error: 'This session has already occurred' };
+    }
+
+    // Must be at least 72 hours before session
+    if (hoursUntilSession < 72) {
+        return { success: false, error: 'Cancellations must be made at least 72 hours before the session' };
+    }
+
+    // Remove the booking
+    const sessions = getSessions();
+    const sessionIndex = sessions.findIndex(s => s.id === session.id);
+    if (sessionIndex === -1) {
+        return { success: false, error: 'Session not found' };
+    }
+
+    const cancelledBooking = sessions[sessionIndex].bookings[bookingIndex];
+    sessions[sessionIndex].bookings.splice(bookingIndex, 1);
+    saveSessions(sessions);
+
+    // Check if within a week (168 hours) - need to notify host
+    const needsNotification = hoursUntilSession <= 168;
+
+    return {
+        success: true,
+        needsNotification,
+        session: sessions[sessionIndex],
+        cancelledBooking
+    };
+}
+
 // Get all sessions from storage
 function getSessions() {
     const data = localStorage.getItem(STORAGE_KEY);
@@ -305,34 +411,43 @@ function deleteSessionById(sessionId) {
     saveSessions(sessions);
 }
 
-// Add a booking to a session (now supports notes)
-function addBooking(sessionId, firstName, lastName, notes = '') {
+// Add a booking to a session (now supports notes and email for guests)
+function addBooking(sessionId, firstName, lastName, notes = '', email = '', isGuest = false) {
     const sessions = getSessions();
     const sessionIndex = sessions.findIndex(s => s.id === sessionId);
 
     if (sessionIndex === -1) {
-        return false;
+        return { success: false };
     }
 
     const session = sessions[sessionIndex];
 
     if (session.bookings.length >= session.capacity) {
-        return false;
+        return { success: false };
     }
 
-    session.bookings.push({
+    const booking = {
         firstName,
         lastName,
         notes: notes || '',
         bookedAt: new Date().toISOString()
-    });
+    };
 
+    // Add email and cancellation token for guest bookings
+    if (isGuest && email) {
+        booking.email = email.toLowerCase();
+        booking.cancellationToken = generateCancellationToken();
+        booking.isGuest = true;
+    }
+
+    session.bookings.push(booking);
     saveSessions(sessions);
-    return true;
+    return { success: true, booking };
 }
 
 // Add multiple bookings to a session at once (for booking multiple slots)
-function addMultipleBookings(sessionId, bookings) {
+// email is shared across all bookings in a group (the person making the booking)
+function addMultipleBookings(sessionId, bookings, email = '') {
     const sessions = getSessions();
     const sessionIndex = sessions.findIndex(s => s.id === sessionId);
 
@@ -347,17 +462,29 @@ function addMultipleBookings(sessionId, bookings) {
         return { success: false, error: `Only ${spotsLeft} spot(s) available` };
     }
 
+    const addedBookings = [];
+
     bookings.forEach(booking => {
-        session.bookings.push({
+        const newBooking = {
             firstName: booking.firstName,
             lastName: booking.lastName,
             notes: booking.notes || '',
             bookedAt: new Date().toISOString()
-        });
+        };
+
+        // Add email and cancellation token for guest bookings
+        if (email) {
+            newBooking.email = email.toLowerCase();
+            newBooking.cancellationToken = generateCancellationToken();
+            newBooking.isGuest = true;
+        }
+
+        session.bookings.push(newBooking);
+        addedBookings.push(newBooking);
     });
 
     saveSessions(sessions);
-    return { success: true, added: bookings.length };
+    return { success: true, added: bookings.length, bookings: addedBookings };
 }
 
 // Remove a booking from a session (host only)
@@ -441,4 +568,57 @@ function clearPastSessions() {
         return sessionDate > now;
     });
     saveSessions(futureSessions);
+}
+
+// ============ CALENDAR EXPORT ============
+
+// Generate ICS file content for a session
+function generateICS(session, participantName = '') {
+    const startDate = new Date(session.date + 'T' + session.time);
+    const endDate = new Date(startDate.getTime() + session.duration * 60000);
+
+    // Format dates for ICS (YYYYMMDDTHHMMSS)
+    const formatICSDate = (date) => {
+        return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    };
+
+    const uid = `${session.id}-${Date.now()}@tunnelsessions`;
+    const title = `${session.sessionType} - Tunnel Session`;
+    const description = participantName ? `Booked for: ${participantName}` : 'Indoor Skydiving Session';
+
+    const icsContent = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Tunnel Sessions//Booking//EN',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        'BEGIN:VEVENT',
+        `UID:${uid}`,
+        `DTSTAMP:${formatICSDate(new Date())}`,
+        `DTSTART:${formatICSDate(startDate)}`,
+        `DTEND:${formatICSDate(endDate)}`,
+        `SUMMARY:${title}`,
+        `DESCRIPTION:${description}`,
+        'STATUS:CONFIRMED',
+        'END:VEVENT',
+        'END:VCALENDAR'
+    ].join('\r\n');
+
+    return icsContent;
+}
+
+// Download ICS file for a session
+function downloadICS(sessionId, participantName = '') {
+    const session = getSessionById(sessionId);
+    if (!session) return;
+
+    const icsContent = generateICS(session, participantName);
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+
+    const dateStr = session.date.replace(/-/g, '');
+    link.download = `tunnel-session-${dateStr}.ics`;
+    link.click();
+    URL.revokeObjectURL(link.href);
 }

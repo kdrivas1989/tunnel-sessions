@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tunnel Sessions - Host Dashboard</title>
+    <meta name="description" content="Manage your indoor skydiving sessions">
+    <meta name="theme-color" content="#6c63ff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tunnel Host">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="shredclub-logo.png">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -116,10 +123,52 @@
 
             <!-- Manage Sessions Section -->
             <section class="card">
-                <h2>Manage Sessions</h2>
+                <div class="section-header">
+                    <h2>Manage Sessions</h2>
+                    <button class="btn btn-small btn-outline" onclick="exportSessionsToCSV()">Export CSV</button>
+                </div>
                 <div id="host-sessions-list" class="host-sessions"></div>
                 <div id="no-host-sessions" class="message hidden">
                     <p>No sessions created yet. Create your first session above!</p>
+                </div>
+            </section>
+
+            <!-- Analytics Section -->
+            <section class="card">
+                <h2>Analytics</h2>
+                <div id="analytics-dashboard" class="analytics-grid">
+                    <div class="stat-card">
+                        <span class="stat-value" id="stat-total-sessions">0</span>
+                        <span class="stat-label">Total Sessions</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="stat-total-bookings">0</span>
+                        <span class="stat-label">Total Bookings</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="stat-upcoming-sessions">0</span>
+                        <span class="stat-label">Upcoming Sessions</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="stat-fill-rate">0%</span>
+                        <span class="stat-label">Avg Fill Rate</span>
+                    </div>
+                </div>
+                <div class="analytics-details" style="margin-top: 20px;">
+                    <div class="analytics-row">
+                        <div class="analytics-column">
+                            <h4>Popular Session Types</h4>
+                            <div id="popular-types"></div>
+                        </div>
+                        <div class="analytics-column">
+                            <h4>Popular Times</h4>
+                            <div id="popular-times"></div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px;">
+                        <h4>Frequent Flyers</h4>
+                        <div id="frequent-flyers"></div>
+                    </div>
                 </div>
             </section>
 
@@ -231,6 +280,10 @@
                                 <option value="Advanced Scrambles">Advanced Scrambles</option>
                             </select>
                         </div>
+                        <div class="form-group">
+                            <label>Participants</label>
+                            <div id="edit-participants-list"></div>
+                        </div>
                         <button type="submit" class="btn btn-primary btn-full">Save Changes</button>
                     </form>
                 </div>
@@ -242,8 +295,21 @@
         </footer>
     </div>
 
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
     <script>
+        // Register service worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then((registration) => {
+                        console.log('ServiceWorker registered:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('ServiceWorker registration failed:', error);
+                    });
+            });
+        }
+
         // Screen management
         const loginScreen = document.getElementById('login-screen');
         const setupScreen = document.getElementById('setup-screen');
@@ -756,6 +822,70 @@
                 const card = createHostSessionCard(session);
                 container.appendChild(card);
             });
+
+            // Update analytics after loading sessions
+            updateAnalytics();
+        }
+
+        function updateAnalytics() {
+            const sessions = getSessions();
+            const now = new Date();
+
+            // Basic stats
+            const totalSessions = sessions.length;
+            const totalBookings = sessions.reduce((sum, s) => sum + s.bookings.length, 0);
+            const upcomingSessions = sessions.filter(s => new Date(s.date + 'T' + s.time) > now).length;
+
+            // Calculate average fill rate for sessions with bookings
+            let fillRate = 0;
+            if (sessions.length > 0) {
+                const totalFill = sessions.reduce((sum, s) => sum + (s.bookings.length / s.capacity), 0);
+                fillRate = Math.round((totalFill / sessions.length) * 100);
+            }
+
+            // Update stat cards
+            document.getElementById('stat-total-sessions').textContent = totalSessions;
+            document.getElementById('stat-total-bookings').textContent = totalBookings;
+            document.getElementById('stat-upcoming-sessions').textContent = upcomingSessions;
+            document.getElementById('stat-fill-rate').textContent = fillRate + '%';
+
+            // Popular session types
+            const typeCounts = {};
+            sessions.forEach(s => {
+                typeCounts[s.sessionType] = (typeCounts[s.sessionType] || 0) + s.bookings.length;
+            });
+            const sortedTypes = Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+            const typesHtml = sortedTypes.length > 0
+                ? '<ul>' + sortedTypes.map(([type, count]) => `<li><span>${type}</span><span>${count} bookings</span></li>`).join('') + '</ul>'
+                : '<p style="color: var(--text-secondary);">No data yet</p>';
+            document.getElementById('popular-types').innerHTML = typesHtml;
+
+            // Popular times
+            const timeCounts = {};
+            sessions.forEach(s => {
+                const hour = parseInt(s.time.split(':')[0]);
+                const timeLabel = hour < 12 ? `${hour}:00 AM` : hour === 12 ? '12:00 PM' : `${hour - 12}:00 PM`;
+                timeCounts[timeLabel] = (timeCounts[timeLabel] || 0) + s.bookings.length;
+            });
+            const sortedTimes = Object.entries(timeCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+            const timesHtml = sortedTimes.length > 0
+                ? '<ul>' + sortedTimes.map(([time, count]) => `<li><span>${time}</span><span>${count} bookings</span></li>`).join('') + '</ul>'
+                : '<p style="color: var(--text-secondary);">No data yet</p>';
+            document.getElementById('popular-times').innerHTML = timesHtml;
+
+            // Frequent flyers
+            const flyerCounts = {};
+            sessions.forEach(s => {
+                s.bookings.forEach(b => {
+                    const name = `${b.firstName} ${b.lastName}`;
+                    flyerCounts[name] = (flyerCounts[name] || 0) + 1;
+                });
+            });
+            const sortedFlyers = Object.entries(flyerCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+            const flyersHtml = sortedFlyers.length > 0
+                ? '<ul>' + sortedFlyers.map(([name, count]) => `<li><span>${name}</span><span>${count} sessions</span></li>`).join('') + '</ul>'
+                : '<p style="color: var(--text-secondary);">No bookings yet</p>';
+            document.getElementById('frequent-flyers').innerHTML = flyersHtml;
         }
 
         function createHostSessionCard(session) {
@@ -783,9 +913,13 @@
             if (session.bookings.length > 0) {
                 bookingsHtml = '<ul class="bookings-list">';
                 session.bookings.forEach((booking, index) => {
+                    const notesHtml = booking.notes ? `<div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">${booking.notes}</div>` : '';
                     bookingsHtml += `
                         <li>
-                            <span>${booking.firstName} ${booking.lastName}</span>
+                            <div style="flex: 1;">
+                                <span>${booking.firstName} ${booking.lastName}</span>
+                                ${notesHtml}
+                            </div>
                             <button class="btn-remove" onclick="removeBooking('${session.id}', ${index})" title="Remove">&#10005;</button>
                         </li>
                     `;
@@ -914,9 +1048,9 @@
                 return;
             }
 
-            const success = addBooking(selectedHostSessionId, firstName, lastName);
+            const result = addBooking(selectedHostSessionId, firstName, lastName);
 
-            if (success) {
+            if (result.success) {
                 document.getElementById('add-person-modal').classList.add('hidden');
                 document.getElementById('add-person-form').reset();
                 loadHostSessions();
@@ -946,6 +1080,56 @@
             loadHostSessions();
         }
 
+        // Export sessions to CSV
+        function exportSessionsToCSV() {
+            const sessions = getSessions();
+            const now = new Date();
+
+            // Filter to future sessions and sort by date
+            const futureSessions = sessions
+                .filter(s => new Date(s.date + 'T' + s.time) > now)
+                .sort((a, b) => new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time));
+
+            if (futureSessions.length === 0) {
+                alert('No upcoming sessions to export.');
+                return;
+            }
+
+            // Build CSV content
+            const headers = ['Date', 'Time', 'Session Type', 'Duration', 'Capacity', 'Booked', 'Participant', 'Notes'];
+            let csvContent = headers.join(',') + '\n';
+
+            futureSessions.forEach(session => {
+                const sessionDate = new Date(session.date + 'T' + session.time);
+                const dateStr = sessionDate.toLocaleDateString('en-US');
+                const timeStr = sessionDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+                if (session.bookings.length === 0) {
+                    // Empty session - one row
+                    csvContent += `"${dateStr}","${timeStr}","${session.sessionType}",${session.duration},${session.capacity},0,"",""\n`;
+                } else {
+                    // One row per participant
+                    session.bookings.forEach((booking, index) => {
+                        const name = `${booking.firstName} ${booking.lastName}`;
+                        const notes = (booking.notes || '').replace(/"/g, '""');
+                        if (index === 0) {
+                            csvContent += `"${dateStr}","${timeStr}","${session.sessionType}",${session.duration},${session.capacity},${session.bookings.length},"${name}","${notes}"\n`;
+                        } else {
+                            csvContent += `"","","","","","","${name}","${notes}"\n`;
+                        }
+                    });
+                }
+            });
+
+            // Download file
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `tunnel-sessions-${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+
         // Edit Session Modal
         let editingSessionId = null;
 
@@ -968,6 +1152,25 @@
                 <p>${timeStr} - ${session.bookings.length} participant(s)</p>
             `;
 
+            // Build editable participants list
+            let participantsHtml = '';
+            if (session.bookings.length > 0) {
+                session.bookings.forEach((booking, index) => {
+                    participantsHtml += `
+                        <div class="edit-participant-row" style="margin-bottom: 12px;">
+                            <div style="display: flex; gap: 8px; margin-bottom: 4px;">
+                                <input type="text" class="edit-first-name" data-index="${index}" value="${booking.firstName || ''}" placeholder="First" style="flex: 1; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px;">
+                                <input type="text" class="edit-last-name" data-index="${index}" value="${booking.lastName || ''}" placeholder="Last" style="flex: 1; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px;">
+                            </div>
+                            <input type="text" class="edit-notes" data-index="${index}" value="${booking.notes || ''}" placeholder="Notes" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.9rem; color: var(--text-secondary);">
+                        </div>
+                    `;
+                });
+            } else {
+                participantsHtml = '<p style="color: var(--text-secondary);">No participants</p>';
+            }
+            document.getElementById('edit-participants-list').innerHTML = participantsHtml;
+
             document.getElementById('editSessionType').value = session.sessionType || 'ShredClub';
             document.getElementById('edit-session-modal').classList.remove('hidden');
         }
@@ -982,7 +1185,28 @@
             const newSessionType = document.getElementById('editSessionType').value;
 
             if (editingSessionId && newSessionType) {
-                updateSession(editingSessionId, { sessionType: newSessionType });
+                // Get the session to update bookings
+                const session = getSessionById(editingSessionId);
+                if (session && session.bookings.length > 0) {
+                    // Update each booking with edited values
+                    const firstNames = document.querySelectorAll('.edit-first-name');
+                    const lastNames = document.querySelectorAll('.edit-last-name');
+                    const notes = document.querySelectorAll('.edit-notes');
+
+                    firstNames.forEach((input, index) => {
+                        if (session.bookings[index]) {
+                            session.bookings[index].firstName = input.value.trim();
+                            session.bookings[index].lastName = lastNames[index].value.trim();
+                            session.bookings[index].notes = notes[index].value.trim();
+                        }
+                    });
+
+                    // Save the updated bookings
+                    updateSession(editingSessionId, { sessionType: newSessionType, bookings: session.bookings });
+                } else {
+                    updateSession(editingSessionId, { sessionType: newSessionType });
+                }
+
                 document.getElementById('edit-session-modal').classList.add('hidden');
                 loadHostSessions();
             }

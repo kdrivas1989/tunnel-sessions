@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tunnel Sessions - Book Your Flight</title>
+    <meta name="description" content="Book your indoor skydiving sessions with Shred Club">
+    <meta name="theme-color" content="#6c63ff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tunnel">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="shredclub-logo.png">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -28,7 +35,15 @@
 
         <main>
             <section id="booking-section">
-                <h2>Available Sessions</h2>
+                <div class="section-header">
+                    <h2>Available Sessions</h2>
+                    <div id="favorites-filter" class="hidden">
+                        <label class="filter-toggle">
+                            <input type="checkbox" id="showFavoritesOnly" onchange="loadAvailableSessions()">
+                            <span>Favorites only</span>
+                        </label>
+                    </div>
+                </div>
                 <div id="no-sessions" class="message hidden">
                     <p>No sessions available at this time. Please check back later!</p>
                 </div>
@@ -174,6 +189,11 @@
                     <div id="session-details"></div>
                     <form id="booking-form">
                         <div class="form-group">
+                            <label for="guestEmail">Your Email (for cancellation link)</label>
+                            <input type="email" id="guestEmail" required placeholder="your@email.com">
+                            <p class="field-hint">We'll show you a cancellation link after booking</p>
+                        </div>
+                        <div class="form-group">
                             <label for="numSlots">How many spots?</label>
                             <select id="numSlots" onchange="updateBookingSlots()">
                                 <option value="1">1 spot</option>
@@ -216,7 +236,28 @@
                     <div class="success-icon">&#10003;</div>
                     <h3>Booking Confirmed!</h3>
                     <p id="success-message"></p>
-                    <button class="btn btn-primary" onclick="closeSuccessModal()">Done</button>
+                    <div id="cancellation-links" class="hidden" style="margin-top: 15px; text-align: left; background: #f5f5f5; padding: 15px; border-radius: 8px;">
+                        <p style="font-weight: 600; margin-bottom: 10px;">Save your cancellation link(s):</p>
+                        <div id="cancellation-links-list"></div>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 10px;">Bookmark this page or copy the link to cancel later (72+ hours before session).</p>
+                    </div>
+                    <div id="calendar-download" class="hidden" style="margin-top: 15px;"></div>
+                    <button class="btn btn-primary" onclick="closeSuccessModal()" style="margin-top: 15px;">Done</button>
+                </div>
+            </div>
+
+            <!-- Guest Cancellation Modal -->
+            <div id="cancel-modal" class="modal hidden">
+                <div class="modal-content">
+                    <span class="close-btn">&times;</span>
+                    <h3>Cancel Booking</h3>
+                    <div id="cancel-booking-details"></div>
+                    <p id="cancel-error" class="error-message hidden"></p>
+                    <p id="cancel-success" class="success-message hidden"></p>
+                    <div id="cancel-actions">
+                        <button class="btn btn-danger" onclick="confirmGuestCancellation()">Yes, Cancel My Booking</button>
+                        <button class="btn btn-outline" onclick="closeCancelModal()" style="margin-left: 10px;">Keep Booking</button>
+                    </div>
                 </div>
             </div>
 
@@ -244,9 +285,25 @@
         </footer>
     </div>
 
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
+    <script>
+        // Register service worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then((registration) => {
+                        console.log('ServiceWorker registered:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('ServiceWorker registration failed:', error);
+                    });
+            });
+        }
+    </script>
     <script>
         let selectedSessionId = null;
+
+        let pendingCancellationToken = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             updateUserBar();
@@ -258,22 +315,134 @@
             const today = new Date().toISOString().split('T')[0];
             const secDateInput = document.getElementById('secSessionDate');
             if (secDateInput) secDateInput.min = today;
+
+            // Check for cancellation token in URL
+            checkForCancellationToken();
         });
+
+        // Check URL for cancellation token
+        function checkForCancellationToken() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('cancel');
+            if (token) {
+                openCancelModalWithToken(token);
+            }
+        }
+
+        // Open cancellation modal with token
+        function openCancelModalWithToken(token) {
+            pendingCancellationToken = token;
+            const result = getBookingByToken(token);
+            const detailsEl = document.getElementById('cancel-booking-details');
+            const errorEl = document.getElementById('cancel-error');
+            const successEl = document.getElementById('cancel-success');
+            const actionsEl = document.getElementById('cancel-actions');
+
+            errorEl.classList.add('hidden');
+            successEl.classList.add('hidden');
+            actionsEl.style.display = 'block';
+
+            if (!result) {
+                detailsEl.innerHTML = '<p>Booking not found or already cancelled.</p>';
+                actionsEl.style.display = 'none';
+                document.getElementById('cancel-modal').classList.remove('hidden');
+                return;
+            }
+
+            const { session, booking } = result;
+            const sessionDateTime = new Date(session.date + 'T' + session.time);
+            const now = new Date();
+            const hoursUntil = (sessionDateTime - now) / (1000 * 60 * 60);
+
+            const dateStr = sessionDateTime.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric'
+            });
+            const timeStr = sessionDateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const badgeClass = getSessionTypeClass(session.sessionType);
+
+            let warningHtml = '';
+            if (hoursUntil < 72) {
+                warningHtml = '<p style="color: var(--error-color); font-weight: 500; margin-top: 10px;">Cancellations must be made at least 72 hours before the session.</p>';
+                actionsEl.style.display = 'none';
+            }
+
+            detailsEl.innerHTML = `
+                <p><span class="session-type-badge ${badgeClass}">${session.sessionType}</span></p>
+                <p><strong>${booking.firstName} ${booking.lastName}</strong></p>
+                <p>${dateStr} at ${timeStr}</p>
+                ${booking.notes ? `<p style="color: var(--text-secondary);">Notes: ${booking.notes}</p>` : ''}
+                ${warningHtml}
+            `;
+
+            document.getElementById('cancel-modal').classList.remove('hidden');
+        }
+
+        // Confirm guest cancellation
+        function confirmGuestCancellation() {
+            if (!pendingCancellationToken) return;
+
+            const result = cancelBookingByToken(pendingCancellationToken);
+            const errorEl = document.getElementById('cancel-error');
+            const successEl = document.getElementById('cancel-success');
+            const actionsEl = document.getElementById('cancel-actions');
+
+            if (result.success) {
+                successEl.textContent = 'Your booking has been cancelled.';
+                successEl.classList.remove('hidden');
+                actionsEl.style.display = 'none';
+                loadAvailableSessions();
+
+                // Clear URL parameter
+                const url = new URL(window.location);
+                url.searchParams.delete('cancel');
+                window.history.replaceState({}, '', url);
+
+                // If within a week, prompt to notify host
+                if (result.needsNotification) {
+                    setTimeout(() => {
+                        sendCancellationText(result.session, result.cancelledBooking);
+                    }, 500);
+                }
+            } else {
+                errorEl.textContent = result.error;
+                errorEl.classList.remove('hidden');
+            }
+        }
+
+        // Close cancel modal
+        function closeCancelModal() {
+            document.getElementById('cancel-modal').classList.add('hidden');
+            pendingCancellationToken = null;
+            // Clear URL parameter
+            const url = new URL(window.location);
+            url.searchParams.delete('cancel');
+            window.history.replaceState({}, '', url);
+        }
+
+        document.querySelector('#cancel-modal .close-btn').addEventListener('click', closeCancelModal);
 
         // Update user bar based on login status
         function updateUserBar() {
             const loggedOut = document.getElementById('user-logged-out');
             const loggedIn = document.getElementById('user-logged-in');
             const greeting = document.getElementById('user-greeting');
+            const favoritesFilter = document.getElementById('favorites-filter');
 
             if (isUserLoggedIn()) {
                 const user = getCurrentUser();
                 greeting.textContent = `Hi, ${user.firstName}!`;
                 loggedOut.classList.add('hidden');
                 loggedIn.classList.remove('hidden');
+                favoritesFilter.classList.remove('hidden');
             } else {
                 loggedOut.classList.remove('hidden');
                 loggedIn.classList.add('hidden');
+                favoritesFilter.classList.add('hidden');
+                // Reset filter when logged out
+                const checkbox = document.getElementById('showFavoritesOnly');
+                if (checkbox) checkbox.checked = false;
             }
         }
 
@@ -281,17 +450,29 @@
             const sessions = getSessions();
             const sessionsContainer = document.getElementById('sessions-list');
             const noSessionsMsg = document.getElementById('no-sessions');
+            const showFavoritesOnly = document.getElementById('showFavoritesOnly')?.checked || false;
 
             sessionsContainer.innerHTML = '';
 
             const now = new Date();
-            const availableSessions = sessions.filter(session => {
+            let availableSessions = sessions.filter(session => {
                 const sessionDate = new Date(session.date + 'T' + session.time);
                 return sessionDate > now && session.bookings.length < session.capacity;
             });
 
+            // Filter by favorites if checkbox is checked
+            if (showFavoritesOnly && isUserLoggedIn()) {
+                const favorites = getUserFavorites();
+                availableSessions = availableSessions.filter(session => favorites.includes(session.id));
+            }
+
             if (availableSessions.length === 0) {
                 noSessionsMsg.classList.remove('hidden');
+                if (showFavoritesOnly) {
+                    noSessionsMsg.querySelector('p').textContent = 'No favorite sessions available. Uncheck the filter to see all sessions.';
+                } else {
+                    noSessionsMsg.querySelector('p').textContent = 'No sessions available at this time. Please check back later!';
+                }
                 sessionsContainer.classList.add('hidden');
                 return;
             }
@@ -370,6 +551,7 @@
                 const timeStr = sessionDateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
                 const badgeClass = getSessionTypeClass(session.sessionType);
 
+                const participantName = `${booking.firstName} ${booking.lastName}`;
                 html += `
                     <div class="session-card">
                         <div class="session-date">
@@ -381,10 +563,13 @@
                             <span class="session-duration">${session.duration} minutes</span>
                             ${booking.notes ? `<span style="color: var(--text-secondary); font-size: 0.9rem;">Note: ${booking.notes}</span>` : ''}
                         </div>
-                        ${canCancel
-                            ? `<button class="btn btn-danger btn-small" onclick="cancelMyBooking('${session.id}')">Cancel Booking</button>`
-                            : `<p style="color: var(--text-secondary); font-size: 0.85rem; text-align: center;">Cannot cancel within 72 hours</p>`
-                        }
+                        <div class="booking-actions">
+                            <button class="btn btn-outline btn-small" onclick="downloadICS('${session.id}', '${participantName.replace(/'/g, "\\'")}')">Add to Calendar</button>
+                            ${canCancel
+                                ? `<button class="btn btn-danger btn-small" onclick="cancelMyBooking('${session.id}')">Cancel</button>`
+                                : `<span style="color: var(--text-secondary); font-size: 0.75rem;">Cannot cancel within 72h</span>`
+                            }
+                        </div>
                     </div>
                 `;
             });
@@ -580,8 +765,30 @@
 
             const badgeClass = getSessionTypeClass(session.sessionType);
 
+            // Favorite button for logged-in users
+            const isFavorited = isLoggedIn && isSessionFavorited(session.id);
+            const favoriteHtml = isLoggedIn
+                ? `<button class="btn-favorite ${isFavorited ? 'favorited' : ''}" onclick="handleToggleFavorite('${session.id}', this)" title="${isFavorited ? 'Remove from favorites' : 'Add to favorites'}">
+                     ${isFavorited ? '&#9829;' : '&#9825;'}
+                   </button>`
+                : '';
+
+            // Build participants list with notes
+            let participantsHtml = '';
+            if (session.bookings && session.bookings.length > 0) {
+                const participantsList = session.bookings.map(b => {
+                    const name = `${b.firstName} ${b.lastName.charAt(0)}.`;
+                    if (b.notes) {
+                        return `<span class="participant-with-note"><strong>${name}</strong> <em>- ${b.notes}</em></span>`;
+                    }
+                    return `<span>${name}</span>`;
+                }).join('');
+                participantsHtml = `<div class="session-participants">${participantsList}</div>`;
+            }
+
             card.innerHTML = `
                 <div class="session-date">
+                    ${favoriteHtml}
                     <span class="session-type-badge ${badgeClass}">${session.sessionType || 'Session'}</span>
                     <span class="day-name">${dayName}</span>
                     <span class="month-day">${monthDay}</span>
@@ -591,10 +798,19 @@
                     <span class="session-duration">${session.duration} minutes</span>
                     <span class="spots-left ${spotsLeft <= 1 ? 'low' : ''}">${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left</span>
                 </div>
+                ${participantsHtml}
                 ${buttonHtml}
             `;
 
             return card;
+        }
+
+        // Handle favorite toggle
+        function handleToggleFavorite(sessionId, button) {
+            const nowFavorited = toggleFavorite(sessionId);
+            button.innerHTML = nowFavorited ? '&#9829;' : '&#9825;';
+            button.classList.toggle('favorited', nowFavorited);
+            button.title = nowFavorited ? 'Remove from favorites' : 'Add to favorites';
         }
 
         // Quick join for logged in users
@@ -608,9 +824,9 @@
             const session = getSessionById(sessionId);
             if (!session) return;
 
-            const success = addBooking(sessionId, user.firstName, user.lastName);
+            const result = addBooking(sessionId, user.firstName, user.lastName);
 
-            if (success) {
+            if (result.success) {
                 const date = new Date(session.date + 'T' + session.time);
                 const dateStr = date.toLocaleDateString('en-US', {
                     weekday: 'long',
@@ -621,9 +837,17 @@
 
                 document.getElementById('success-message').innerHTML =
                     `${user.firstName} ${user.lastName}, you're booked for<br><strong>${dateStr} at ${timeStr}</strong>`;
+                document.getElementById('cancellation-links').classList.add('hidden');
+
+                // Show calendar download button
+                const calendarDiv = document.getElementById('calendar-download');
+                calendarDiv.innerHTML = `<button class="btn btn-outline" onclick="downloadICS('${sessionId}', '${user.firstName} ${user.lastName}')">Add to Calendar</button>`;
+                calendarDiv.classList.remove('hidden');
+
                 document.getElementById('success-modal').classList.remove('hidden');
 
                 loadAvailableSessions();
+                loadMyBookings();
             } else {
                 alert('Sorry, this session is now full. Please choose another time.');
                 loadAvailableSessions();
@@ -820,6 +1044,7 @@
         document.getElementById('booking-form').addEventListener('submit', (e) => {
             e.preventDefault();
 
+            const guestEmail = document.getElementById('guestEmail').value.trim();
             const numSlots = parseInt(document.getElementById('numSlots').value);
             const bookings = [];
 
@@ -836,7 +1061,7 @@
                 bookings.push({ firstName, lastName, notes });
             }
 
-            const result = addMultipleBookings(selectedSessionId, bookings);
+            const result = addMultipleBookings(selectedSessionId, bookings, guestEmail);
 
             if (result.success) {
                 document.getElementById('booking-modal').classList.add('hidden');
@@ -854,8 +1079,46 @@
                 const names = bookings.map(b => `${b.firstName} ${b.lastName}`).join(', ');
                 document.getElementById('success-message').innerHTML =
                     `${names}<br>booked for<br><strong>${dateStr} at ${timeStr}</strong>`;
-                document.getElementById('success-modal').classList.remove('hidden');
 
+                // Show cancellation links for guest bookings
+                if (result.bookings && result.bookings.length > 0) {
+                    const linksContainer = document.getElementById('cancellation-links');
+                    const linksList = document.getElementById('cancellation-links-list');
+                    const baseUrl = window.location.origin + window.location.pathname;
+
+                    let linksHtml = '';
+                    result.bookings.forEach(booking => {
+                        if (booking.cancellationToken) {
+                            const cancelUrl = `${baseUrl}?cancel=${booking.cancellationToken}`;
+                            const emailSubject = encodeURIComponent(`Tunnel Sessions Cancellation Link - ${booking.firstName} ${booking.lastName}`);
+                            const emailBody = encodeURIComponent(`Here's your cancellation link for ${booking.firstName} ${booking.lastName}'s booking on ${dateStr} at ${timeStr}:\n\n${cancelUrl}\n\nNote: Cancellations must be made at least 72 hours before the session.`);
+                            const mailtoLink = `mailto:${booking.email || ''}?subject=${emailSubject}&body=${emailBody}`;
+
+                            linksHtml += `
+                                <div style="margin-bottom: 10px; padding: 8px; background: white; border-radius: 4px;">
+                                    <strong>${booking.firstName} ${booking.lastName}</strong><br>
+                                    <input type="text" value="${cancelUrl}" readonly style="width: 100%; font-size: 0.8rem; padding: 5px; margin-top: 5px; border: 1px solid #ddd; border-radius: 4px;" onclick="this.select()">
+                                    <div style="margin-top: 5px; display: flex; gap: 5px; flex-wrap: wrap;">
+                                        <button type="button" class="btn btn-small btn-outline" onclick="copyToClipboard('${cancelUrl}')">Copy</button>
+                                        <a href="${mailtoLink}" class="btn btn-small btn-outline" style="text-decoration: none;">Email to Myself</a>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    });
+
+                    if (linksHtml) {
+                        linksList.innerHTML = linksHtml;
+                        linksContainer.classList.remove('hidden');
+                    }
+                }
+
+                // Show calendar download button
+                const calendarDiv = document.getElementById('calendar-download');
+                calendarDiv.innerHTML = `<button class="btn btn-outline" onclick="downloadICS('${selectedSessionId}', '${names}')">Add to Calendar</button>`;
+                calendarDiv.classList.remove('hidden');
+
+                document.getElementById('success-modal').classList.remove('hidden');
                 loadAvailableSessions();
             } else {
                 alert(result.error || 'Sorry, this session is now full. Please choose another time.');
@@ -863,8 +1126,28 @@
             }
         });
 
+        // Copy to clipboard helper
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Link copied to clipboard!');
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('Link copied to clipboard!');
+            });
+        }
+
         function closeSuccessModal() {
             document.getElementById('success-modal').classList.add('hidden');
+            document.getElementById('cancellation-links').classList.add('hidden');
+            document.getElementById('cancellation-links-list').innerHTML = '';
+            document.getElementById('calendar-download').classList.add('hidden');
+            document.getElementById('calendar-download').innerHTML = '';
         }
 
         document.querySelector('#success-modal .close-btn').addEventListener('click', closeSuccessModal);
