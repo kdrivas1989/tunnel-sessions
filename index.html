@@ -29,6 +29,7 @@
             </div>
             <div id="user-logged-in" class="hidden">
                 <span id="user-greeting"></span>
+                <a id="host-dashboard-link" href="host.html" class="btn btn-small btn-primary hidden">Host Dashboard</a>
                 <button class="btn btn-small btn-outline" onclick="handleUserLogout()">Logout</button>
             </div>
         </div>
@@ -429,6 +430,7 @@
             const loggedIn = document.getElementById('user-logged-in');
             const greeting = document.getElementById('user-greeting');
             const favoritesFilter = document.getElementById('favorites-filter');
+            const hostDashboardLink = document.getElementById('host-dashboard-link');
 
             if (isUserLoggedIn()) {
                 const user = getCurrentUser();
@@ -436,10 +438,20 @@
                 loggedOut.classList.add('hidden');
                 loggedIn.classList.remove('hidden');
                 favoritesFilter.classList.remove('hidden');
+
+                // Show Host Dashboard link if user is a host
+                const hosts = getHosts();
+                const isHost = hosts.some(h => h.email.toLowerCase() === user.email.toLowerCase());
+                if (isHost) {
+                    hostDashboardLink.classList.remove('hidden');
+                } else {
+                    hostDashboardLink.classList.add('hidden');
+                }
             } else {
                 loggedOut.classList.remove('hidden');
                 loggedIn.classList.add('hidden');
                 favoritesFilter.classList.add('hidden');
+                hostDashboardLink.classList.add('hidden');
                 // Reset filter when logged out
                 const checkbox = document.getElementById('showFavoritesOnly');
                 if (checkbox) checkbox.checked = false;
