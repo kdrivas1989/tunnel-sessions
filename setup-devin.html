@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Setup Devin Account</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Setup Account</h1>
+        </header>
+        <main>
+            <section class="card">
+                <div id="status"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js?v=6"></script>
+    <script>
+        const email = 'dmurray6113@yahoo.com';
+        const password = '123456'; // Default password - should be changed
+
+        let statusHtml = '<h2>Setting up dmurray6113@yahoo.com...</h2><ul>';
+
+        // Add as host
+        const hostResult = createHost(email, password);
+        if (hostResult.success) {
+            statusHtml += '<li style="color: var(--success-color);">✓ Added as Host</li>';
+        } else {
+            statusHtml += `<li style="color: orange;">⚠ Host: ${hostResult.error}</li>`;
+        }
+
+        // Add as user
+        const userResult = createUser('Devin', 'Murray', email, password);
+        if (userResult.success) {
+            statusHtml += '<li style="color: var(--success-color);">✓ Added as User</li>';
+        } else {
+            statusHtml += `<li style="color: orange;">⚠ User: ${userResult.error}</li>`;
+        }
+
+        statusHtml += '</ul>';
+        statusHtml += '<p style="margin-top: 20px;"><strong>Default password:</strong> 123456 (please change after login)</p>';
+        statusHtml += '<div style="margin-top: 30px; display: flex; flex-direction: row; gap: 15px;"><a href="host.html" class="btn btn-primary" style="display: inline-block;">Go to Host Dashboard</a><a href="index.html" class="btn btn-outline" style="display: inline-block;">Go to Booking Page</a></div>';
+
+        document.getElementById('status').innerHTML = statusHtml;
+    </script>
+</body>
+</html>
