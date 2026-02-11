@@ -38,11 +38,14 @@
             <section id="booking-section">
                 <div class="section-header">
                     <h2>Available Sessions</h2>
-                    <div id="favorites-filter" class="hidden">
-                        <label class="filter-toggle">
-                            <input type="checkbox" id="showFavoritesOnly" onchange="loadAvailableSessions()">
-                            <span>Favorites only</span>
-                        </label>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div id="favorites-filter" class="hidden">
+                            <label class="filter-toggle">
+                                <input type="checkbox" id="showFavoritesOnly" onchange="loadAvailableSessions()">
+                                <span>Favorites only</span>
+                            </label>
+                        </div>
+                        <button id="book-selected-btn" class="btn btn-primary hidden" onclick="openMultiBookingModal()">Book Selected (<span id="selected-count">0</span>)</button>
                     </div>
                 </div>
                 <div id="no-sessions" class="message hidden">
@@ -759,6 +762,31 @@
             }
         });
 
+        // Track selected sessions for multi-booking
+        let selectedSessions = [];
+
+        function toggleSessionSelection(sessionId, checkbox) {
+            if (checkbox.checked) {
+                if (!selectedSessions.includes(sessionId)) {
+                    selectedSessions.push(sessionId);
+                }
+            } else {
+                selectedSessions = selectedSessions.filter(id => id !== sessionId);
+            }
+            updateBookSelectedButton();
+        }
+
+        function updateBookSelectedButton() {
+            const btn = document.getElementById('book-selected-btn');
+            const countSpan = document.getElementById('selected-count');
+            countSpan.textContent = selectedSessions.length;
+            if (selectedSessions.length > 0) {
+                btn.classList.remove('hidden');
+            } else {
+                btn.classList.add('hidden');
+            }
+        }
+
         function createSessionCard(session) {
             const card = document.createElement('div');
             card.className = 'session-card';
@@ -768,12 +796,21 @@
             const monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
             const spotsLeft = session.capacity - session.bookings.length;
+            const isFull = spotsLeft <= 0;
 
             // Check if user is logged in for quick join
             const isLoggedIn = isUserLoggedIn();
-            const buttonHtml = isLoggedIn
-                ? `<button class="btn btn-book btn-join" onclick="quickJoin('${session.id}')">Join</button>`
-                : `<button class="btn btn-book" onclick="openBookingModal('${session.id}')">Book Now</button>`;
+
+            // Checkbox for multi-select (only if not full)
+            const checkboxHtml = !isFull
+                ? `<input type="checkbox" class="session-checkbox" onclick="toggleSessionSelection('${session.id}', this)" title="Select for multi-booking">`
+                : '';
+
+            const buttonHtml = isFull
+                ? `<span class="btn btn-book btn-full-disabled">Full</span>`
+                : isLoggedIn
+                    ? `<button class="btn btn-book btn-join" onclick="quickJoin('${session.id}')">Join</button>`
+                    : `<button class="btn btn-book" onclick="openBookingModal('${session.id}')">Book Now</button>`;
 
             const badgeClass = getSessionTypeClass(session.sessionType);
 
@@ -800,6 +837,7 @@
 
             card.innerHTML = `
                 <div class="session-date">
+                    ${checkboxHtml}
                     ${favoriteHtml}
                     <span class="session-type-badge ${badgeClass}">${session.sessionType || 'Session'}</span>
                     <span class="day-name">${dayName}</span>
@@ -808,7 +846,7 @@
                 <div class="session-info">
                     <span class="session-time">${timeStr}</span>
                     <span class="session-duration">${session.duration} minutes</span>
-                    <span class="spots-left ${spotsLeft <= 1 ? 'low' : ''}">${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left</span>
+                    <span class="spots-left ${spotsLeft <= 0 ? 'full' : spotsLeft <= 1 ? 'low' : ''}">${isFull ? 'Full' : spotsLeft + ' spot' + (spotsLeft !== 1 ? 's' : '') + ' left'}</span>
                 </div>
                 ${participantsHtml}
                 ${buttonHtml}
@@ -971,8 +1009,12 @@
             loadSecretarySection();
         }
 
+        // Track if we're doing multi-session booking
+        let isMultiSessionBooking = false;
+
         // Booking Modal (for guests)
         function openBookingModal(sessionId) {
+            isMultiSessionBooking = false;
             selectedSessionId = sessionId;
             const session = getSessionById(sessionId);
 
@@ -1009,6 +1051,44 @@
             const numSlotsSelect = document.getElementById('numSlots');
             numSlotsSelect.innerHTML = '';
             for (let i = 1; i <= Math.min(spotsLeft, 4); i++) {
+                numSlotsSelect.innerHTML += `<option value="${i}">${i} spot${i !== 1 ? 's' : ''}</option>`;
+            }
+            numSlotsSelect.value = '1';
+            updateBookingSlots();
+
+            document.getElementById('booking-modal').classList.remove('hidden');
+            document.getElementById('firstName1').focus();
+        }
+
+        // Multi-session booking modal
+        function openMultiBookingModal() {
+            if (selectedSessions.length === 0) return;
+
+            isMultiSessionBooking = true;
+
+            // Build session list HTML
+            let sessionsHtml = '<div style="margin-bottom: 15px;"><strong>Booking into ' + selectedSessions.length + ' session(s):</strong><ul style="margin: 10px 0; padding-left: 20px;">';
+            let minSpots = Infinity;
+
+            selectedSessions.forEach(sessionId => {
+                const session = getSessionById(sessionId);
+                if (session) {
+                    const date = new Date(session.date + 'T' + session.time);
+                    const dateStr = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                    const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                    const spotsLeft = session.capacity - session.bookings.length;
+                    minSpots = Math.min(minSpots, spotsLeft);
+                    sessionsHtml += `<li>${dateStr} at ${timeStr} (${spotsLeft} spots)</li>`;
+                }
+            });
+            sessionsHtml += '</ul></div>';
+
+            document.getElementById('session-details').innerHTML = sessionsHtml;
+
+            // Update slot dropdown based on minimum available spots across all sessions
+            const numSlotsSelect = document.getElementById('numSlots');
+            numSlotsSelect.innerHTML = '';
+            for (let i = 1; i <= Math.min(minSpots, 4); i++) {
                 numSlotsSelect.innerHTML += `<option value="${i}">${i} spot${i !== 1 ? 's' : ''}</option>`;
             }
             numSlotsSelect.value = '1';
@@ -1071,6 +1151,38 @@
                 }
 
                 bookings.push({ firstName, lastName, notes });
+            }
+
+            // Handle multi-session booking
+            if (isMultiSessionBooking && selectedSessions.length > 0) {
+                let allResults = [];
+                let successCount = 0;
+
+                selectedSessions.forEach(sessionId => {
+                    const result = addMultipleBookings(sessionId, bookings, guestEmail);
+                    if (result.success) {
+                        successCount++;
+                        allResults.push({ sessionId, bookings: result.bookings });
+                    }
+                });
+
+                document.getElementById('booking-modal').classList.add('hidden');
+                document.getElementById('booking-form').reset();
+
+                const names = bookings.map(b => `${b.firstName} ${b.lastName}`).join(', ');
+                document.getElementById('success-message').innerHTML =
+                    `${names}<br>booked into<br><strong>${successCount} session(s)</strong>`;
+
+                // Clear selections
+                selectedSessions = [];
+                updateBookSelectedButton();
+                document.querySelectorAll('.session-checkbox').forEach(cb => cb.checked = false);
+
+                document.getElementById('cancellation-links').classList.add('hidden');
+                document.getElementById('calendar-download').classList.add('hidden');
+                document.getElementById('success-modal').classList.remove('hidden');
+                loadAvailableSessions();
+                return;
             }
 
             const result = addMultipleBookings(selectedSessionId, bookings, guestEmail);
