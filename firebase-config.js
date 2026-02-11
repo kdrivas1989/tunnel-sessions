@@ -3,12 +3,12 @@
 // Get these from: https://console.firebase.google.com/ > Project Settings > Your Apps
 
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyCk--xCcz0XFx9Qp0ZuLlwKQNIPVOzRAGc",
+    authDomain: "tunnel-sessions.firebaseapp.com",
+    projectId: "tunnel-sessions",
+    storageBucket: "tunnel-sessions.firebasestorage.app",
+    messagingSenderId: "582837847135",
+    appId: "1:582837847135:web:2f31458bdc2fd0112307ea"
 };
 
 // Initialize Firebase
