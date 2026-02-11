@@ -1,0 +1,33 @@
+# Environment and secrets
+.env
+.env.*
+*.local
+secrets.js
+config.local.js
+
+# API keys and credentials
+*-credentials.json
+*-service-account.json
+firebase-admin*.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Dependencies (if using npm later)
+node_modules/
+
+# Build output
+dist/
+build/
