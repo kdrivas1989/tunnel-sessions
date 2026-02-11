@@ -132,6 +132,7 @@
                     <h2>Manage Sessions</h2>
                     <button class="btn btn-small btn-outline" onclick="exportSessionsToCSV()">Export CSV</button>
                 </div>
+                <div id="host-month-filter" class="month-filter"></div>
                 <div id="host-sessions-list" class="host-sessions"></div>
                 <div id="no-host-sessions" class="message hidden">
                     <p>No sessions created yet. Create your first session above!</p>
@@ -853,19 +854,55 @@
             }
         }
 
+        // Track selected month filter for host page
+        let hostSelectedMonth = 'all';
+
+        function setHostMonthFilter(month) {
+            hostSelectedMonth = month;
+            document.querySelectorAll('#host-month-filter .month-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.month === month);
+            });
+            loadHostSessions();
+        }
+
         function loadHostSessions() {
             const sessions = getSessions();
             const container = document.getElementById('host-sessions-list');
             const noSessionsMsg = document.getElementById('no-host-sessions');
+            const monthFilterContainer = document.getElementById('host-month-filter');
             const now = new Date();
 
             container.innerHTML = '';
 
             // Filter out past sessions
-            const futureSessions = sessions.filter(s => {
+            let futureSessions = sessions.filter(s => {
                 const sessionDate = new Date(s.date + 'T' + s.time);
                 return sessionDate >= now;
             });
+
+            // Generate month filter buttons
+            const months = {};
+            futureSessions.forEach(session => {
+                const date = new Date(session.date);
+                const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                months[monthKey] = monthName;
+            });
+
+            let monthButtonsHtml = `<button class="btn month-btn ${hostSelectedMonth === 'all' ? 'active' : ''}" data-month="all" onclick="setHostMonthFilter('all')">All</button>`;
+            Object.keys(months).sort().forEach(monthKey => {
+                monthButtonsHtml += `<button class="btn month-btn ${hostSelectedMonth === monthKey ? 'active' : ''}" data-month="${monthKey}" onclick="setHostMonthFilter('${monthKey}')">${months[monthKey]}</button>`;
+            });
+            monthFilterContainer.innerHTML = monthButtonsHtml;
+
+            // Filter by selected month
+            if (hostSelectedMonth !== 'all') {
+                futureSessions = futureSessions.filter(session => {
+                    const date = new Date(session.date);
+                    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                    return monthKey === hostSelectedMonth;
+                });
+            }
 
             if (futureSessions.length === 0) {
                 noSessionsMsg.classList.remove('hidden');

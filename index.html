@@ -52,6 +52,9 @@
                         <button id="book-selected-btn" class="btn btn-primary hidden" onclick="openMultiBookingModal()">Book Selected (<span id="selected-count">0</span>)</button>
                     </div>
                 </div>
+                <div id="month-filter" class="month-filter">
+                    <!-- Month buttons will be generated dynamically -->
+                </div>
                 <div id="no-sessions" class="message hidden">
                     <p>No sessions available at this time. Please check back later!</p>
                 </div>
@@ -465,10 +468,23 @@
             }
         }
 
+        // Track selected month filter
+        let selectedMonth = 'all';
+
+        function setMonthFilter(month) {
+            selectedMonth = month;
+            // Update button states
+            document.querySelectorAll('.month-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.month === month);
+            });
+            loadAvailableSessions();
+        }
+
         function loadAvailableSessions() {
             const sessions = getSessions();
             const sessionsContainer = document.getElementById('sessions-list');
             const noSessionsMsg = document.getElementById('no-sessions');
+            const monthFilterContainer = document.getElementById('month-filter');
             const showFavoritesOnly = document.getElementById('showFavoritesOnly')?.checked || false;
 
             sessionsContainer.innerHTML = '';
@@ -478,6 +494,30 @@
                 const sessionDate = new Date(session.date + 'T' + session.time);
                 return sessionDate > now;
             });
+
+            // Generate month filter buttons
+            const months = {};
+            availableSessions.forEach(session => {
+                const date = new Date(session.date);
+                const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                months[monthKey] = monthName;
+            });
+
+            let monthButtonsHtml = `<button class="btn month-btn ${selectedMonth === 'all' ? 'active' : ''}" data-month="all" onclick="setMonthFilter('all')">All</button>`;
+            Object.keys(months).sort().forEach(monthKey => {
+                monthButtonsHtml += `<button class="btn month-btn ${selectedMonth === monthKey ? 'active' : ''}" data-month="${monthKey}" onclick="setMonthFilter('${monthKey}')">${months[monthKey]}</button>`;
+            });
+            monthFilterContainer.innerHTML = monthButtonsHtml;
+
+            // Filter by selected month
+            if (selectedMonth !== 'all') {
+                availableSessions = availableSessions.filter(session => {
+                    const date = new Date(session.date);
+                    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                    return monthKey === selectedMonth;
+                });
+            }
 
             // Filter by favorites if checkbox is checked
             if (showFavoritesOnly && isUserLoggedIn()) {
