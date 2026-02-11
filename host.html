@@ -212,6 +212,24 @@
                 <div id="hosts-list"></div>
             </section>
 
+            <!-- Host Management Section (Admin Only) -->
+            <section id="host-management" class="card hidden">
+                <h2>Manage Hosts</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">Hosts can manage sessions and bookings.</p>
+                <div id="hosts-list"></div>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                    <h4 style="margin-bottom: 10px;">Add New Host</h4>
+                    <form id="add-host-form" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+                        <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0;">
+                            <label for="addHostEmail">Email</label>
+                            <input type="email" id="addHostEmail" placeholder="email@example.com" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add Host</button>
+                    </form>
+                    <p class="field-hint" style="margin-top: 5px;">Default password: 123456</p>
+                </div>
+            </section>
+
             <!-- User Management Section (Admin Only) -->
             <section id="user-management" class="card hidden">
                 <h2>Manage Users (Admin Only)</h2>
@@ -481,8 +499,26 @@
             }
         }
 
-        // Create host form
-        document.getElementById('create-host-form').addEventListener('submit', (e) => {
+        // Add host form (simple version with default password)
+        document.getElementById('add-host-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('addHostEmail').value.trim();
+            const defaultPassword = '123456';
+
+            const result = createHost(email, defaultPassword);
+
+            if (result.success) {
+                alert('Host added successfully! Default password: 123456');
+                document.getElementById('add-host-form').reset();
+                loadHosts();
+            } else {
+                alert('Error: ' + result.error);
+            }
+        });
+
+        // Create host form (if exists)
+        const createHostForm = document.getElementById('create-host-form');
+        if (createHostForm) createHostForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const email = document.getElementById('newHostEmail').value.trim();
             const password = document.getElementById('newHostPassword').value;
@@ -514,6 +550,7 @@
         // Load and display users (admin only)
         function loadUsers() {
             const users = getUsers();
+            const hosts = getHosts();
             const container = document.getElementById('users-list');
 
             if (users.length === 0) {
@@ -524,17 +561,28 @@
             let html = '<ul class="bookings-list">';
             users.forEach(user => {
                 const hasSecretary = user.permissions && user.permissions.includes('secretary');
-                const permissionBadge = hasSecretary
-                    ? '<span style="background: var(--secondary-color); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; margin-left: 8px;">Secretary</span>'
+                const isHost = hosts.some(h => h.email.toLowerCase() === user.email.toLowerCase());
+
+                let badges = '';
+                if (isHost) {
+                    badges += '<span style="background: var(--success-color); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; margin-left: 8px;">Host</span>';
+                }
+                if (hasSecretary) {
+                    badges += '<span style="background: var(--secondary-color); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; margin-left: 8px;">Secretary</span>';
+                }
+
+                const makeHostBtn = !isHost
+                    ? `<button class="btn btn-small btn-text" onclick="makeUserHost('${user.email}')">Make Host</button>`
                     : '';
 
                 html += `
                     <li style="flex-wrap: wrap; gap: 10px;">
                         <div>
-                            <strong>${user.firstName} ${user.lastName}</strong>${permissionBadge}<br>
+                            <strong>${user.firstName} ${user.lastName}</strong>${badges}<br>
                             <span style="color: var(--text-secondary); font-size: 0.9rem;">${user.email}</span>
                         </div>
                         <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                            ${makeHostBtn}
                             <button class="btn btn-small ${hasSecretary ? 'btn-danger' : 'btn-primary'}" onclick="toggleSecretaryPermission('${user.id}')">
                                 ${hasSecretary ? 'Remove Secretary' : 'Make Secretary'}
                             </button>
@@ -546,6 +594,18 @@
             });
             html += '</ul>';
             container.innerHTML = html;
+        }
+
+        // Make user a host
+        function makeUserHost(email) {
+            const result = createHost(email, '123456');
+            if (result.success) {
+                alert('User is now a host! Default password: 123456');
+                loadHosts();
+                loadUsers();
+            } else {
+                alert('Error: ' + result.error);
+            }
         }
 
         // Toggle secretary permission
