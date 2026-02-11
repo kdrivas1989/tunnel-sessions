@@ -436,11 +436,16 @@ function cancelBookingByToken(token) {
     // Check if within a week (168 hours) - need to notify host
     const needsNotification = hoursUntilSession <= 168;
 
+    // Get waitlist info for notification
+    const waitlist = sessions[sessionIndex].waitlist || [];
+    const nextOnWaitlist = waitlist.length > 0 ? waitlist[0] : null;
+
     return {
         success: true,
         needsNotification,
         session: sessions[sessionIndex],
-        cancelledBooking
+        cancelledBooking,
+        nextOnWaitlist
     };
 }
 
@@ -649,11 +654,16 @@ function cancelUserBooking(sessionId, firstName, lastName) {
     // Check if within a week (168 hours) - need to notify host
     const needsNotification = hoursUntilSession <= 168;
 
+    // Get waitlist info for notification
+    const waitlist = session.waitlist || [];
+    const nextOnWaitlist = waitlist.length > 0 ? waitlist[0] : null;
+
     return {
         success: true,
         needsNotification,
         session,
-        cancelledBooking
+        cancelledBooking,
+        nextOnWaitlist
     };
 }
 
@@ -733,4 +743,119 @@ function downloadICS(sessionId, participantName = '') {
     link.download = `tunnel-session-${dateStr}.ics`;
     link.click();
     URL.revokeObjectURL(link.href);
+}
+
+// Generate Google Calendar URL for a session
+function generateGoogleCalendarLink(sessionId, participantName = '') {
+    const session = getSessionById(sessionId);
+    if (!session) return '';
+
+    const startDate = new Date(session.date + 'T' + session.time);
+    const endDate = new Date(startDate.getTime() + session.duration * 60000);
+
+    // Format dates for Google Calendar (YYYYMMDDTHHMMSS)
+    const formatGoogleDate = (date) => {
+        return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    };
+
+    const title = encodeURIComponent(`${session.sessionType} - Tunnel Session`);
+    const description = participantName
+        ? encodeURIComponent(`Booked for: ${participantName}`)
+        : encodeURIComponent('Indoor Skydiving Session');
+    const dates = `${formatGoogleDate(startDate)}/${formatGoogleDate(endDate)}`;
+
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${description}`;
+}
+
+// Open Google Calendar with session details
+function openGoogleCalendar(sessionId, participantName = '') {
+    const url = generateGoogleCalendarLink(sessionId, participantName);
+    if (url) {
+        window.open(url, '_blank');
+    }
+}
+
+// ============ WAITLIST ============
+
+// Join waitlist for a full session
+function joinWaitlist(sessionId, email, firstName, lastName) {
+    const sessions = getSessions();
+    const sessionIndex = sessions.findIndex(s => s.id === sessionId);
+
+    if (sessionIndex === -1) {
+        return { success: false, error: 'Session not found' };
+    }
+
+    const session = sessions[sessionIndex];
+
+    // Initialize waitlist if it doesn't exist
+    if (!session.waitlist) {
+        session.waitlist = [];
+    }
+
+    // Check if already on waitlist
+    const alreadyOnWaitlist = session.waitlist.some(
+        w => w.email.toLowerCase() === email.toLowerCase()
+    );
+    if (alreadyOnWaitlist) {
+        return { success: false, error: 'You are already on the waitlist for this session' };
+    }
+
+    // Check if already booked
+    const alreadyBooked = session.bookings.some(
+        b => b.firstName.toLowerCase() === firstName.toLowerCase() &&
+             b.lastName.toLowerCase() === lastName.toLowerCase()
+    );
+    if (alreadyBooked) {
+        return { success: false, error: 'You are already booked for this session' };
+    }
+
+    // Add to waitlist
+    session.waitlist.push({
+        email: email.toLowerCase(),
+        firstName,
+        lastName,
+        addedAt: new Date().toISOString()
+    });
+
+    saveSessions(sessions);
+    return { success: true, position: session.waitlist.length };
+}
+
+// Get waitlist for a session
+function getWaitlist(sessionId) {
+    const session = getSessionById(sessionId);
+    if (!session) return [];
+    return session.waitlist || [];
+}
+
+// Remove from waitlist
+function removeFromWaitlist(sessionId, email) {
+    const sessions = getSessions();
+    const sessionIndex = sessions.findIndex(s => s.id === sessionId);
+
+    if (sessionIndex === -1) return false;
+
+    const session = sessions[sessionIndex];
+    if (!session.waitlist) return false;
+
+    const originalLength = session.waitlist.length;
+    session.waitlist = session.waitlist.filter(
+        w => w.email.toLowerCase() !== email.toLowerCase()
+    );
+
+    if (session.waitlist.length < originalLength) {
+        saveSessions(sessions);
+        return true;
+    }
+    return false;
+}
+
+// Get waitlist info for notification when a spot opens
+function getNextOnWaitlist(sessionId) {
+    const session = getSessionById(sessionId);
+    if (!session || !session.waitlist || session.waitlist.length === 0) {
+        return null;
+    }
+    return session.waitlist[0];
 }

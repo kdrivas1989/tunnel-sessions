@@ -1032,6 +1032,31 @@
                 bookingsHtml = '<p class="no-bookings">No bookings yet</p>';
             }
 
+            // Waitlist section
+            let waitlistHtml = '';
+            const waitlist = session.waitlist || [];
+            if (waitlist.length > 0) {
+                waitlistHtml = `
+                    <div class="waitlist-container" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                        <h4 style="color: #f59e0b;">Waitlist (${waitlist.length}):</h4>
+                        <ul class="bookings-list">
+                            ${waitlist.map((person, index) => `
+                                <li>
+                                    <div style="flex: 1;">
+                                        <span>${person.firstName} ${person.lastName}</span>
+                                        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">${person.email}</div>
+                                    </div>
+                                    <div style="display: flex; gap: 5px;">
+                                        ${session.bookings.length < session.capacity ? `<button class="btn btn-small btn-join" onclick="promoteFromWaitlist('${session.id}', '${person.email}')" title="Add to session">Promote</button>` : ''}
+                                        <button class="btn-remove" onclick="removeFromWaitlistHost('${session.id}', '${person.email}')" title="Remove from waitlist">&#10005;</button>
+                                    </div>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
             const hasBookings = session.bookings.length > 0;
             const textBtn = hasBookings && !isPast ? `<button class="btn btn-small btn-text" onclick="textParticipants('${session.id}')">Text List</button>` : '';
             const editBtn = !isPast ? `<button class="btn btn-small btn-edit" onclick="openEditSessionModal('${session.id}')">Edit</button>` : '';
@@ -1054,6 +1079,7 @@
                     <h4>Bookings:</h4>
                     ${bookingsHtml}
                 </div>
+                ${waitlistHtml}
             `;
 
             return card;
@@ -1183,8 +1209,79 @@
 
         function removeBooking(sessionId, bookingIndex) {
             if (confirm('Remove this person from the session?')) {
+                // Check if there's someone on the waitlist to notify
+                const session = getSessionById(sessionId);
+                const nextOnWaitlist = session && session.waitlist && session.waitlist.length > 0 ? session.waitlist[0] : null;
+
                 removeBookingFromSession(sessionId, bookingIndex);
                 loadHostSessions();
+
+                // Notify about waitlist if someone is waiting
+                if (nextOnWaitlist) {
+                    const sessionDateTime = new Date(session.date + 'T' + session.time);
+                    const dateStr = sessionDateTime.toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                    const timeStr = sessionDateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+                    alert(`A spot has opened up!\n\nNext on waitlist: ${nextOnWaitlist.firstName} ${nextOnWaitlist.lastName}\nEmail: ${nextOnWaitlist.email}\n\nYou can promote them to the session or contact them directly.`);
+                }
+            }
+        }
+
+        // Remove someone from waitlist (host action)
+        function removeFromWaitlistHost(sessionId, email) {
+            if (confirm('Remove this person from the waitlist?')) {
+                removeFromWaitlist(sessionId, email);
+                loadHostSessions();
+            }
+        }
+
+        // Promote someone from waitlist to session
+        function promoteFromWaitlist(sessionId, email) {
+            const session = getSessionById(sessionId);
+            if (!session) return;
+
+            const waitlistPerson = session.waitlist.find(w => w.email.toLowerCase() === email.toLowerCase());
+            if (!waitlistPerson) {
+                alert('Person not found on waitlist');
+                return;
+            }
+
+            // Check if there's space
+            if (session.bookings.length >= session.capacity) {
+                alert('Session is full. Cannot promote from waitlist.');
+                return;
+            }
+
+            if (confirm(`Add ${waitlistPerson.firstName} ${waitlistPerson.lastName} to the session?`)) {
+                // Add to session
+                const result = addBooking(sessionId, waitlistPerson.firstName, waitlistPerson.lastName);
+                if (result.success) {
+                    // Remove from waitlist
+                    removeFromWaitlist(sessionId, email);
+                    loadHostSessions();
+
+                    // Prompt to notify the person
+                    const sessionDateTime = new Date(session.date + 'T' + session.time);
+                    const dateStr = sessionDateTime.toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                    const timeStr = sessionDateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+                    const message = `Great news! A spot opened up and you've been added to ${session.sessionType} on ${dateStr} at ${timeStr}. See you there!`;
+
+                    if (confirm(`${waitlistPerson.firstName} has been added!\n\nWould you like to send them a notification email?`)) {
+                        const mailtoLink = `mailto:${waitlistPerson.email}?subject=${encodeURIComponent('You\'ve been added to the session!')}&body=${encodeURIComponent(message)}`;
+                        window.open(mailtoLink, '_blank');
+                    }
+                } else {
+                    alert('Could not add to session. It may be full.');
+                }
             }
         }
 

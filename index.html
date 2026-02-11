@@ -63,10 +63,20 @@
 
             <!-- My Bookings Section (logged in users only) -->
             <section id="my-bookings-section" class="hidden" style="margin-top: 30px;">
-                <h2>My Bookings</h2>
+                <div class="section-header">
+                    <h2>My Bookings</h2>
+                    <div class="booking-tabs">
+                        <button class="btn btn-small tab-btn active" id="upcoming-tab" onclick="switchBookingTab('upcoming')">Upcoming</button>
+                        <button class="btn btn-small tab-btn" id="past-tab" onclick="switchBookingTab('past')">Past</button>
+                    </div>
+                </div>
                 <div id="my-bookings-list"></div>
+                <div id="my-past-bookings-list" class="hidden"></div>
                 <div id="no-my-bookings" class="message hidden">
                     <p>You have no upcoming bookings.</p>
+                </div>
+                <div id="no-my-past-bookings" class="message hidden">
+                    <p>You have no past bookings.</p>
                 </div>
             </section>
 
@@ -252,7 +262,9 @@
                         <div id="cancellation-links-list"></div>
                         <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 10px;">Bookmark this page or copy the link to cancel later (72+ hours before session).</p>
                     </div>
-                    <div id="calendar-download" class="hidden" style="margin-top: 15px;"></div>
+                    <div id="calendar-download" class="hidden" style="margin-top: 15px;">
+                        <div class="calendar-buttons"></div>
+                    </div>
                     <button class="btn btn-primary" onclick="closeSuccessModal()" style="margin-top: 15px;">Done</button>
                 </div>
             </div>
@@ -287,6 +299,35 @@
                         <button type="submit" class="btn btn-primary btn-full">Send Reset Request</button>
                     </form>
                     <p class="modal-switch" style="margin-top: 15px;"><a href="#" onclick="switchToLoginFromForgot()">Back to Login</a></p>
+                </div>
+            </div>
+
+            <!-- Waitlist Modal -->
+            <div id="waitlist-modal" class="modal hidden">
+                <div class="modal-content">
+                    <span class="close-btn">&times;</span>
+                    <h3>Join Waitlist</h3>
+                    <div id="waitlist-session-details"></div>
+                    <form id="waitlist-form">
+                        <div class="form-group">
+                            <label for="waitlistEmail">Your Email</label>
+                            <input type="email" id="waitlistEmail" required placeholder="your@email.com">
+                            <p class="field-hint">We'll notify you if a spot opens up</p>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="waitlistFirstName">First Name</label>
+                                <input type="text" id="waitlistFirstName" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="waitlistLastName">Last Name</label>
+                                <input type="text" id="waitlistLastName" required>
+                            </div>
+                        </div>
+                        <p id="waitlist-error" class="error-message hidden"></p>
+                        <p id="waitlist-success" class="success-message hidden"></p>
+                        <button type="submit" class="btn btn-primary btn-full">Join Waitlist</button>
+                    </form>
                 </div>
             </div>
         </main>
@@ -413,7 +454,7 @@
                 // If within a week, prompt to notify host
                 if (result.needsNotification) {
                     setTimeout(() => {
-                        sendCancellationText(result.session, result.cancelledBooking);
+                        sendCancellationText(result.session, result.cancelledBooking, result.nextOnWaitlist);
                     }, 500);
                 }
             } else {
@@ -551,11 +592,30 @@
             });
         }
 
+        // Track current booking tab
+        let currentBookingTab = 'upcoming';
+
+        // Switch between upcoming and past bookings
+        function switchBookingTab(tab) {
+            currentBookingTab = tab;
+            document.getElementById('upcoming-tab').classList.toggle('active', tab === 'upcoming');
+            document.getElementById('past-tab').classList.toggle('active', tab === 'past');
+
+            document.getElementById('my-bookings-list').classList.toggle('hidden', tab !== 'upcoming');
+            document.getElementById('my-past-bookings-list').classList.toggle('hidden', tab !== 'past');
+            document.getElementById('no-my-bookings').classList.toggle('hidden', tab !== 'upcoming' || document.getElementById('my-bookings-list').innerHTML !== '');
+            document.getElementById('no-my-past-bookings').classList.toggle('hidden', tab !== 'past' || document.getElementById('my-past-bookings-list').innerHTML !== '');
+
+            loadMyBookings();
+        }
+
         // Load user's bookings
         function loadMyBookings() {
             const section = document.getElementById('my-bookings-section');
             const container = document.getElementById('my-bookings-list');
+            const pastContainer = document.getElementById('my-past-bookings-list');
             const noBookingsMsg = document.getElementById('no-my-bookings');
+            const noPastBookingsMsg = document.getElementById('no-my-past-bookings');
 
             if (!isUserLoggedIn()) {
                 section.classList.add('hidden');
@@ -568,72 +628,129 @@
             const now = new Date();
 
             // Find all sessions where this user has a booking
-            const myBookings = [];
+            const upcomingBookings = [];
+            const pastBookings = [];
+
             sessions.forEach(session => {
                 const sessionDateTime = new Date(session.date + 'T' + session.time);
-                if (sessionDateTime > now) {
-                    session.bookings.forEach((booking, index) => {
-                        if (booking.firstName.toLowerCase() === user.firstName.toLowerCase() &&
-                            booking.lastName.toLowerCase() === user.lastName.toLowerCase()) {
-                            myBookings.push({ session, booking, bookingIndex: index });
+                session.bookings.forEach((booking, index) => {
+                    if (booking.firstName.toLowerCase() === user.firstName.toLowerCase() &&
+                        booking.lastName.toLowerCase() === user.lastName.toLowerCase()) {
+                        if (sessionDateTime > now) {
+                            upcomingBookings.push({ session, booking, bookingIndex: index });
+                        } else {
+                            pastBookings.push({ session, booking, bookingIndex: index });
                         }
-                    });
-                }
+                    }
+                });
             });
 
-            if (myBookings.length === 0) {
-                noBookingsMsg.classList.remove('hidden');
+            // Render upcoming bookings
+            if (upcomingBookings.length === 0) {
+                noBookingsMsg.classList.toggle('hidden', currentBookingTab !== 'upcoming');
                 container.innerHTML = '';
-                return;
+            } else {
+                noBookingsMsg.classList.add('hidden');
+
+                // Sort by date
+                upcomingBookings.sort((a, b) => {
+                    const dateA = new Date(a.session.date + 'T' + a.session.time);
+                    const dateB = new Date(b.session.date + 'T' + b.session.time);
+                    return dateA - dateB;
+                });
+
+                let html = '<div class="sessions-grid">';
+                upcomingBookings.forEach(({ session, booking }) => {
+                    const sessionDateTime = new Date(session.date + 'T' + session.time);
+                    const hoursUntil = (sessionDateTime - now) / (1000 * 60 * 60);
+                    const canCancel = hoursUntil >= 72;
+
+                    const dateStr = sessionDateTime.toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                    const timeStr = sessionDateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                    const badgeClass = getSessionTypeClass(session.sessionType);
+
+                    const participantName = `${booking.firstName} ${booking.lastName}`;
+                    html += `
+                        <div class="session-card">
+                            <div class="session-date">
+                                <span class="session-type-badge ${badgeClass}">${session.sessionType || 'Session'}</span>
+                                <span class="day-name">${dateStr}</span>
+                            </div>
+                            <div class="session-info">
+                                <span class="session-time">${timeStr}</span>
+                                <span class="session-duration">${session.duration} minutes</span>
+                                ${booking.notes ? `<span style="color: var(--text-secondary); font-size: 0.9rem;">Note: ${booking.notes}</span>` : ''}
+                            </div>
+                            <div class="booking-actions">
+                                <button class="btn btn-outline btn-small" onclick="openGoogleCalendar('${session.id}', '${participantName.replace(/'/g, "\\'")}')">Google</button>
+                                <button class="btn btn-outline btn-small btn-apple" onclick="downloadICS('${session.id}', '${participantName.replace(/'/g, "\\'")}')">Apple</button>
+                                ${canCancel
+                                    ? `<button class="btn btn-danger btn-small" onclick="cancelMyBooking('${session.id}')">Cancel</button>`
+                                    : `<span style="color: var(--text-secondary); font-size: 0.75rem;">Cannot cancel within 72h</span>`
+                                }
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                container.innerHTML = html;
             }
 
-            noBookingsMsg.classList.add('hidden');
+            // Render past bookings
+            if (pastBookings.length === 0) {
+                noPastBookingsMsg.classList.toggle('hidden', currentBookingTab !== 'past');
+                pastContainer.innerHTML = '';
+            } else {
+                noPastBookingsMsg.classList.add('hidden');
 
-            // Sort by date
-            myBookings.sort((a, b) => {
-                const dateA = new Date(a.session.date + 'T' + a.session.time);
-                const dateB = new Date(b.session.date + 'T' + b.session.time);
-                return dateA - dateB;
-            });
-
-            let html = '<div class="sessions-grid">';
-            myBookings.forEach(({ session, booking }) => {
-                const sessionDateTime = new Date(session.date + 'T' + session.time);
-                const hoursUntil = (sessionDateTime - now) / (1000 * 60 * 60);
-                const canCancel = hoursUntil >= 72;
-
-                const dateStr = sessionDateTime.toLocaleDateString('en-US', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric'
+                // Sort by date (most recent first)
+                pastBookings.sort((a, b) => {
+                    const dateA = new Date(a.session.date + 'T' + a.session.time);
+                    const dateB = new Date(b.session.date + 'T' + b.session.time);
+                    return dateB - dateA;
                 });
-                const timeStr = sessionDateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-                const badgeClass = getSessionTypeClass(session.sessionType);
 
-                const participantName = `${booking.firstName} ${booking.lastName}`;
-                html += `
-                    <div class="session-card">
-                        <div class="session-date">
-                            <span class="session-type-badge ${badgeClass}">${session.sessionType || 'Session'}</span>
-                            <span class="day-name">${dateStr}</span>
+                let html = '<div class="sessions-grid">';
+                pastBookings.forEach(({ session, booking }) => {
+                    const sessionDateTime = new Date(session.date + 'T' + session.time);
+
+                    const dateStr = sessionDateTime.toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                    });
+                    const timeStr = sessionDateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                    const badgeClass = getSessionTypeClass(session.sessionType);
+
+                    html += `
+                        <div class="session-card past-booking">
+                            <div class="session-date">
+                                <span class="session-type-badge ${badgeClass}">${session.sessionType || 'Session'}</span>
+                                <span class="day-name">${dateStr}</span>
+                            </div>
+                            <div class="session-info">
+                                <span class="session-time">${timeStr}</span>
+                                <span class="session-duration">${session.duration} minutes</span>
+                                ${booking.notes ? `<span style="color: var(--text-secondary); font-size: 0.9rem;">Note: ${booking.notes}</span>` : ''}
+                            </div>
+                            <div class="booking-actions">
+                                <span class="completed-badge">Completed</span>
+                            </div>
                         </div>
-                        <div class="session-info">
-                            <span class="session-time">${timeStr}</span>
-                            <span class="session-duration">${session.duration} minutes</span>
-                            ${booking.notes ? `<span style="color: var(--text-secondary); font-size: 0.9rem;">Note: ${booking.notes}</span>` : ''}
-                        </div>
-                        <div class="booking-actions">
-                            <button class="btn btn-outline btn-small" onclick="downloadICS('${session.id}', '${participantName.replace(/'/g, "\\'")}')">Add to Calendar</button>
-                            ${canCancel
-                                ? `<button class="btn btn-danger btn-small" onclick="cancelMyBooking('${session.id}')">Cancel</button>`
-                                : `<span style="color: var(--text-secondary); font-size: 0.75rem;">Cannot cancel within 72h</span>`
-                            }
-                        </div>
-                    </div>
-                `;
-            });
-            html += '</div>';
-            container.innerHTML = html;
+                    `;
+                });
+                html += '</div>';
+                pastContainer.innerHTML = html;
+            }
+
+            // Show/hide based on current tab
+            container.classList.toggle('hidden', currentBookingTab !== 'upcoming');
+            pastContainer.classList.toggle('hidden', currentBookingTab !== 'past');
         }
 
         // Cancel user's booking
@@ -648,7 +765,7 @@
             if (result.success) {
                 // If within a week, send text to host
                 if (result.needsNotification) {
-                    sendCancellationText(result.session, result.cancelledBooking);
+                    sendCancellationText(result.session, result.cancelledBooking, result.nextOnWaitlist);
                 }
 
                 alert('Booking cancelled successfully.');
@@ -660,7 +777,7 @@
         }
 
         // Send cancellation text to host
-        function sendCancellationText(session, booking) {
+        function sendCancellationText(session, booking, nextOnWaitlist = null) {
             const settings = JSON.parse(localStorage.getItem('tunnelSessionsSettings') || '{}');
             const phones = settings.autoTextPhones || [settings.autoTextPhone || '9784917053'];
 
@@ -672,7 +789,12 @@
             });
             const timeStr = sessionDateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-            const message = `CANCELLATION: ${booking.firstName} ${booking.lastName} has cancelled their booking for ${session.sessionType} on ${dateStr} at ${timeStr}`;
+            let message = `CANCELLATION: ${booking.firstName} ${booking.lastName} has cancelled their booking for ${session.sessionType} on ${dateStr} at ${timeStr}`;
+
+            // Add waitlist info if someone is waiting
+            if (nextOnWaitlist) {
+                message += `\n\nWAITLIST: ${nextOnWaitlist.firstName} ${nextOnWaitlist.lastName} (${nextOnWaitlist.email}) is next on the waitlist.`;
+            }
 
             // Open SMS to first phone number
             if (phones.length > 0) {
@@ -851,7 +973,7 @@
                 : '';
 
             const buttonHtml = isFull
-                ? `<span class="btn btn-book btn-full-disabled">Full</span>`
+                ? `<button class="btn btn-book btn-waitlist" onclick="openWaitlistModal('${session.id}')">Join Waitlist</button>`
                 : isLoggedIn
                     ? `<button class="btn btn-book btn-join" onclick="quickJoin('${session.id}')">Join</button>`
                     : `<button class="btn btn-book" onclick="openBookingModal('${session.id}')">Book Now</button>`;
@@ -933,9 +1055,16 @@
                     `${user.firstName} ${user.lastName}, you're booked for<br><strong>${dateStr} at ${timeStr}</strong>`;
                 document.getElementById('cancellation-links').classList.add('hidden');
 
-                // Show calendar download button
+                // Show calendar download buttons
                 const calendarDiv = document.getElementById('calendar-download');
-                calendarDiv.innerHTML = `<button class="btn btn-outline" onclick="downloadICS('${sessionId}', '${user.firstName} ${user.lastName}')">Add to Calendar</button>`;
+                const participantNameEscaped = `${user.firstName} ${user.lastName}`.replace(/'/g, "\\'");
+                calendarDiv.innerHTML = `
+                    <div class="calendar-buttons">
+                        <button class="btn btn-outline" onclick="openGoogleCalendar('${sessionId}', '${participantNameEscaped}')">Google Calendar</button>
+                        <button class="btn btn-outline btn-apple" onclick="downloadICS('${sessionId}', '${participantNameEscaped}')">Apple Calendar</button>
+                        <button class="btn btn-outline" onclick="downloadICS('${sessionId}', '${participantNameEscaped}')">Download .ics</button>
+                    </div>
+                `;
                 calendarDiv.classList.remove('hidden');
 
                 document.getElementById('success-modal').classList.remove('hidden');
@@ -1281,9 +1410,16 @@
                     }
                 }
 
-                // Show calendar download button
+                // Show calendar download buttons
                 const calendarDiv = document.getElementById('calendar-download');
-                calendarDiv.innerHTML = `<button class="btn btn-outline" onclick="downloadICS('${selectedSessionId}', '${names}')">Add to Calendar</button>`;
+                const namesEscaped = names.replace(/'/g, "\\'");
+                calendarDiv.innerHTML = `
+                    <div class="calendar-buttons">
+                        <button class="btn btn-outline" onclick="openGoogleCalendar('${selectedSessionId}', '${namesEscaped}')">Google Calendar</button>
+                        <button class="btn btn-outline btn-apple" onclick="downloadICS('${selectedSessionId}', '${namesEscaped}')">Apple Calendar</button>
+                        <button class="btn btn-outline" onclick="downloadICS('${selectedSessionId}', '${namesEscaped}')">Download .ics</button>
+                    </div>
+                `;
                 calendarDiv.classList.remove('hidden');
 
                 document.getElementById('success-modal').classList.remove('hidden');
@@ -1382,6 +1518,86 @@
             successEl.textContent = 'Reset request submitted! An admin will reset your password and contact you.';
             successEl.classList.remove('hidden');
             document.getElementById('forgot-password-form').reset();
+        });
+
+        // Waitlist Modal
+        let waitlistSessionId = null;
+
+        function openWaitlistModal(sessionId) {
+            waitlistSessionId = sessionId;
+            const session = getSessionById(sessionId);
+
+            if (!session) return;
+
+            const date = new Date(session.date + 'T' + session.time);
+            const dateStr = date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+            });
+            const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const badgeClass = getSessionTypeClass(session.sessionType);
+            const waitlistCount = session.waitlist ? session.waitlist.length : 0;
+
+            document.getElementById('waitlist-session-details').innerHTML = `
+                <p class="session-type-badge ${badgeClass}">${session.sessionType || 'Session'}</p>
+                <p><strong>${dateStr}</strong></p>
+                <p>${timeStr} - ${session.duration} minutes</p>
+                <p style="color: var(--danger-color); font-weight: 500;">Session is full (${session.bookings.length}/${session.capacity})</p>
+                ${waitlistCount > 0 ? `<p style="color: var(--text-secondary); font-size: 0.9rem;">${waitlistCount} person(s) on waitlist</p>` : ''}
+            `;
+
+            // Pre-fill with logged in user's info if available
+            if (isUserLoggedIn()) {
+                const user = getCurrentUser();
+                document.getElementById('waitlistEmail').value = user.email || '';
+                document.getElementById('waitlistFirstName').value = user.firstName || '';
+                document.getElementById('waitlistLastName').value = user.lastName || '';
+            }
+
+            document.getElementById('waitlist-error').classList.add('hidden');
+            document.getElementById('waitlist-success').classList.add('hidden');
+            document.getElementById('waitlist-modal').classList.remove('hidden');
+            document.getElementById('waitlistEmail').focus();
+        }
+
+        document.querySelector('#waitlist-modal .close-btn').addEventListener('click', () => {
+            document.getElementById('waitlist-modal').classList.add('hidden');
+            document.getElementById('waitlist-form').reset();
+            document.getElementById('waitlist-error').classList.add('hidden');
+            document.getElementById('waitlist-success').classList.add('hidden');
+        });
+
+        document.getElementById('waitlist-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('waitlistEmail').value.trim();
+            const firstName = document.getElementById('waitlistFirstName').value.trim();
+            const lastName = document.getElementById('waitlistLastName').value.trim();
+            const errorEl = document.getElementById('waitlist-error');
+            const successEl = document.getElementById('waitlist-success');
+
+            errorEl.classList.add('hidden');
+            successEl.classList.add('hidden');
+
+            const result = joinWaitlist(waitlistSessionId, email, firstName, lastName);
+
+            if (result.success) {
+                successEl.textContent = `You're #${result.position} on the waitlist! We'll notify the host if a spot opens up.`;
+                successEl.classList.remove('hidden');
+                document.getElementById('waitlist-form').reset();
+
+                // Close modal after 3 seconds
+                setTimeout(() => {
+                    document.getElementById('waitlist-modal').classList.add('hidden');
+                    successEl.classList.add('hidden');
+                    loadAvailableSessions();
+                }, 3000);
+            } else {
+                errorEl.textContent = result.error;
+                errorEl.classList.remove('hidden');
+            }
         });
 
         // Close modals when clicking outside
