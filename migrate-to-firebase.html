@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Migrate to Firebase</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Migrate to Firebase</h1>
+            <p class="tagline">Transfer your data to the cloud</p>
+        </header>
+        <main>
+            <section class="card">
+                <div id="status">
+                    <h2>Checking connection...</h2>
+                </div>
+                <div id="actions" class="hidden" style="margin-top: 20px;">
+                    <button class="btn btn-primary" onclick="migrateData()">Migrate Data to Firebase</button>
+                </div>
+                <div id="results" class="hidden" style="margin-top: 20px;"></div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', checkConnection);
+
+        async function checkConnection() {
+            const statusEl = document.getElementById('status');
+            const actionsEl = document.getElementById('actions');
+
+            try {
+                // Test Firebase connection
+                await db.collection('_test').doc('connection').set({ test: true, time: new Date().toISOString() });
+                await db.collection('_test').doc('connection').delete();
+
+                // Check local data
+                const sessions = JSON.parse(localStorage.getItem('tunnelSessions') || '[]');
+                const hosts = JSON.parse(localStorage.getItem('tunnelSessionsHosts') || '[]');
+                const users = JSON.parse(localStorage.getItem('tunnelSessionsUsers') || '[]');
+
+                statusEl.innerHTML = `
+                    <h2 style="color: var(--success-color);">Firebase Connected!</h2>
+                    <p style="margin-top: 15px;"><strong>Local data found:</strong></p>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        <li>${sessions.length} sessions</li>
+                        <li>${hosts.length} hosts</li>
+                        <li>${users.length} users</li>
+                    </ul>
+                `;
+
+                if (sessions.length > 0 || hosts.length > 0 || users.length > 0) {
+                    actionsEl.classList.remove('hidden');
+                } else {
+                    statusEl.innerHTML += '<p style="color: var(--text-secondary);">No local data to migrate.</p>';
+                }
+
+            } catch (error) {
+                statusEl.innerHTML = `
+                    <h2 style="color: var(--danger-color);">Firebase Connection Failed</h2>
+                    <p style="margin-top: 15px;">Please check your firebase-config.js file.</p>
+                    <p style="margin-top: 10px; font-size: 0.9rem; color: var(--text-secondary);">Error: ${error.message}</p>
+                `;
+            }
+        }
+
+        async function migrateData() {
+            const statusEl = document.getElementById('status');
+            const actionsEl = document.getElementById('actions');
+            const resultsEl = document.getElementById('results');
+
+            actionsEl.classList.add('hidden');
+            statusEl.innerHTML = '<h2>Migrating data...</h2>';
+
+            let results = [];
+
+            try {
+                // Migrate sessions
+                const sessions = JSON.parse(localStorage.getItem('tunnelSessions') || '[]');
+                for (const session of sessions) {
+                    await db.collection('sessions').doc(session.id).set(session);
+                }
+                results.push(`✓ Migrated ${sessions.length} sessions`);
+
+                // Migrate hosts
+                const hosts = JSON.parse(localStorage.getItem('tunnelSessionsHosts') || '[]');
+                for (const host of hosts) {
+                    await db.collection('hosts').doc(host.email.toLowerCase()).set(host);
+                }
+                results.push(`✓ Migrated ${hosts.length} hosts`);
+
+                // Migrate users
+                const users = JSON.parse(localStorage.getItem('tunnelSessionsUsers') || '[]');
+                for (const user of users) {
+                    await db.collection('users').doc(user.id).set(user);
+                }
+                results.push(`✓ Migrated ${users.length} users`);
+
+                // Migrate settings
+                const settings = JSON.parse(localStorage.getItem('tunnelSessionsSettings') || '{}');
+                if (Object.keys(settings).length > 0) {
+                    await db.collection('settings').doc('app').set(settings);
+                    results.push('✓ Migrated settings');
+                }
+
+                statusEl.innerHTML = '<h2 style="color: var(--success-color);">Migration Complete!</h2>';
+                resultsEl.innerHTML = `
+                    <ul style="list-style: none; padding: 0;">
+                        ${results.map(r => `<li style="color: var(--success-color); margin: 5px 0;">${r}</li>`).join('')}
+                    </ul>
+                    <p style="margin-top: 20px;">Your data is now stored in Firebase and will sync across all devices.</p>
+                    <div style="margin-top: 20px; display: flex; gap: 15px;">
+                        <a href="host.html" class="btn btn-primary">Go to Host Dashboard</a>
+                        <a href="index.html" class="btn btn-outline">Go to Booking Page</a>
+                    </div>
+                `;
+                resultsEl.classList.remove('hidden');
+
+            } catch (error) {
+                statusEl.innerHTML = `
+                    <h2 style="color: var(--danger-color);">Migration Failed</h2>
+                    <p style="margin-top: 15px;">Error: ${error.message}</p>
+                `;
+                actionsEl.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>

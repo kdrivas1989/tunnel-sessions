@@ -1,5 +1,5 @@
 // Tunnel Sessions - Core Application Logic
-// Data is stored in localStorage
+// Data is stored in Firebase (with localStorage fallback)
 
 const STORAGE_KEY = 'tunnelSessions';
 const ADMIN_KEY = 'tunnelSessionsAdmin';
@@ -8,6 +8,74 @@ const USERS_KEY = 'tunnelSessionsUsers';
 const USER_SESSION_KEY = 'tunnelSessionsCurrentUser';
 const HOSTS_KEY = 'tunnelSessionsHosts';
 const FAVORITES_KEY = 'tunnelSessionsFavorites';
+const SETTINGS_KEY = 'tunnelSessionsSettings';
+
+// Firebase state
+let useFirebase = false;
+let firebaseReady = false;
+let dataListeners = [];
+
+// Check if Firebase is available and configured
+function isFirebaseConfigured() {
+    return typeof firebase !== 'undefined' &&
+           typeof db !== 'undefined' &&
+           firebase.apps &&
+           firebase.apps.length > 0;
+}
+
+// Initialize Firebase data and set up listeners
+async function initFirebase() {
+    if (!isFirebaseConfigured()) {
+        console.log('Firebase not configured, using localStorage');
+        return false;
+    }
+
+    try {
+        useFirebase = true;
+        console.log('Initializing Firebase...');
+
+        // Set up real-time listener for sessions
+        db.collection('sessions').onSnapshot((snapshot) => {
+            const sessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Update localStorage cache for offline support
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+            // Notify listeners
+            dataListeners.forEach(fn => fn());
+        });
+
+        // Set up listener for hosts
+        db.collection('hosts').onSnapshot((snapshot) => {
+            const hosts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            localStorage.setItem(HOSTS_KEY, JSON.stringify(hosts));
+        });
+
+        // Set up listener for users
+        db.collection('users').onSnapshot((snapshot) => {
+            const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        });
+
+        firebaseReady = true;
+        console.log('Firebase initialized successfully');
+        return true;
+    } catch (error) {
+        console.error('Firebase initialization failed:', error);
+        useFirebase = false;
+        return false;
+    }
+}
+
+// Register a listener for data changes
+function onDataChange(callback) {
+    dataListeners.push(callback);
+}
+
+// Auto-initialize Firebase when DOM is ready
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(initFirebase, 100);
+    });
+}
 
 // ============ ADMIN AUTHENTICATION ============
 
@@ -92,9 +160,17 @@ function getUsers() {
     return data ? JSON.parse(data) : [];
 }
 
-// Save users
+// Save users (and Firebase if available)
 function saveUsers(users) {
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
+
+    // Sync to Firebase if available
+    if (useFirebase && firebaseReady) {
+        users.forEach(user => {
+            db.collection('users').doc(user.id).set(user)
+                .catch(err => console.error('Error syncing user to Firebase:', err));
+        });
+    }
 }
 
 // Create user account
@@ -235,9 +311,17 @@ function getHosts() {
     return data ? JSON.parse(data) : [];
 }
 
-// Save hosts
+// Save hosts (and Firebase if available)
 function saveHosts(hosts) {
     localStorage.setItem(HOSTS_KEY, JSON.stringify(hosts));
+
+    // Sync to Firebase if available
+    if (useFirebase && firebaseReady) {
+        hosts.forEach(host => {
+            db.collection('hosts').doc(host.email.toLowerCase()).set(host)
+                .catch(err => console.error('Error syncing host to Firebase:', err));
+        });
+    }
 }
 
 // Create host account (admin only)
@@ -366,9 +450,37 @@ function getSessions() {
     return data ? JSON.parse(data) : [];
 }
 
-// Save sessions to storage
+// Save sessions to storage (and Firebase if available)
 function saveSessions(sessions) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+
+    // Sync to Firebase if available
+    if (useFirebase && firebaseReady) {
+        sessions.forEach(session => {
+            db.collection('sessions').doc(session.id).set(session)
+                .catch(err => console.error('Error syncing session to Firebase:', err));
+        });
+    }
+}
+
+// Save a single session to Firebase
+async function saveSessionToFirebase(session) {
+    if (!useFirebase || !firebaseReady) return;
+    try {
+        await db.collection('sessions').doc(session.id).set(session);
+    } catch (error) {
+        console.error('Error saving session to Firebase:', error);
+    }
+}
+
+// Delete session from Firebase
+async function deleteSessionFromFirebase(sessionId) {
+    if (!useFirebase || !firebaseReady) return;
+    try {
+        await db.collection('sessions').doc(sessionId).delete();
+    } catch (error) {
+        console.error('Error deleting session from Firebase:', error);
+    }
 }
 
 // Get session by ID
