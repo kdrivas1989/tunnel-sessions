@@ -2,151 +2,127 @@
 
 # Tunnel Sessions - Automatic Daily Text Script
 # Sends texts at 12pm to ALL configured phone numbers with all sessions for the day
-# Fetches data directly from Firebase (not localStorage)
+# Fetches data directly from Firebase REST API
 
-open -a Safari "https://booking.kd-evolution.com/auto-text.html"
-sleep 8  # Allow time for page to load
+TODAY=$(date +%Y-%m-%d)
 
-# First, inject async code that stores result in a global variable
-osascript << 'EOF'
-tell application "Safari"
-    set jsCode to "
-        window._textResult = null;
-        window._textError = null;
+# Fetch sessions from Firebase
+SESSIONS_JSON=$(curl -s "https://firestore.googleapis.com/v1/projects/tunnel-sessions/databases/(default)/documents/sessions")
 
-        (async function() {
-            try {
-                // Wait for Firebase to be ready
-                let attempts = 0;
-                while (!window.db && attempts < 20) {
-                    await new Promise(r => setTimeout(r, 500));
-                    attempts++;
-                }
+# Fetch settings from Firebase
+SETTINGS_JSON=$(curl -s "https://firestore.googleapis.com/v1/projects/tunnel-sessions/databases/(default)/documents/settings/app")
 
-                if (!window.db) {
-                    window._textError = 'Firebase not loaded';
-                    return;
-                }
+# Parse phone numbers from settings
+PHONES=$(echo "$SETTINGS_JSON" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+fields = data.get('fields', {})
+phones = []
+if 'autoTextPhones' in fields:
+    arr = fields['autoTextPhones'].get('arrayValue', {}).get('values', [])
+    phones = [v['stringValue'] for v in arr if 'stringValue' in v]
+elif 'autoTextPhone' in fields:
+    phones = [fields['autoTextPhone']['stringValue']]
+if not phones:
+    phones = ['9784917053']
+print(','.join(phones))
+")
 
-                // Fetch settings directly from Firebase
-                let settings = {};
-                try {
-                    const settingsDoc = await db.collection('settings').doc('app').get();
-                    if (settingsDoc.exists) settings = settingsDoc.data();
-                } catch (e) {
-                    console.error('Failed to get settings:', e);
-                }
+# Parse today's sessions and build message
+MESSAGE=$(echo "$SESSIONS_JSON" | python3 -c "
+import sys, json
+from datetime import datetime
 
-                // Get phone numbers
-                let phones = [];
-                if (settings.autoTextPhones && settings.autoTextPhones.length > 0) {
-                    phones = settings.autoTextPhones;
-                } else if (settings.autoTextPhone) {
-                    phones = [settings.autoTextPhone];
-                } else {
-                    phones = ['9784917053'];
-                }
+data = json.load(sys.stdin)
+today = '$TODAY'
 
-                const today = new Date().toISOString().split('T')[0];
+sessions = []
+for doc in data.get('documents', []):
+    fields = doc.get('fields', {})
+    date = fields.get('date', {}).get('stringValue', '')
+    if date != today:
+        continue
 
-                // Fetch sessions directly from Firebase
-                const snapshot = await db.collection('sessions').get();
-                const sessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                const todaysSessions = sessions.filter(s => s.date === today && s.bookings && s.bookings.length > 0);
+    bookings_arr = fields.get('bookings', {}).get('arrayValue', {}).get('values', [])
+    if not bookings_arr:
+        continue
 
-                if (todaysSessions.length === 0) {
-                    window._textResult = '';
-                    return;
-                }
+    time = fields.get('time', {}).get('stringValue', '')
+    session_type = fields.get('sessionType', {}).get('stringValue', '')
 
-                // Sort by time
-                todaysSessions.sort((a, b) => a.time.localeCompare(b.time));
+    bookings = []
+    for b in bookings_arr:
+        bf = b.get('mapValue', {}).get('fields', {})
+        first = bf.get('firstName', {}).get('stringValue', '')
+        last = bf.get('lastName', {}).get('stringValue', '')
+        if first or last:
+            bookings.append(f'{first} {last}'.strip())
 
-                // Build one combined message
-                const dateStr = new Date(today + 'T12:00:00').toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    month: 'short',
-                    day: 'numeric'
-                });
+    if bookings:
+        sessions.append({
+            'time': time,
+            'type': session_type,
+            'bookings': bookings
+        })
 
-                let message = 'Tunnel Sessions - ' + dateStr + '\\n';
-                message += '================================\\n\\n';
+if not sessions:
+    print('')
+    sys.exit(0)
 
-                todaysSessions.forEach(s => {
-                    const date = new Date(s.date + 'T' + s.time);
-                    const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-                    const names = s.bookings.map(b => '  - ' + b.firstName + ' ' + b.lastName).join('\\n');
-                    message += s.sessionType + ' @ ' + timeStr + '\\n' + names + '\\n\\n';
-                });
+# Sort by time
+sessions.sort(key=lambda s: s['time'])
 
-                window._textResult = phones.join(',') + '|||' + message.trim();
-            } catch (err) {
-                window._textError = err.toString();
-            }
-        })();
-    "
-    do JavaScript jsCode in current tab of front window
-end tell
-EOF
+# Format date
+dt = datetime.strptime(today, '%Y-%m-%d')
+date_str = dt.strftime('%A, %b %d').replace(' 0', ' ')
 
-# Wait for async operation to complete
-sleep 5
+# Build message
+msg = f'Tunnel Sessions - {date_str}\n'
+msg += '================================\n\n'
 
-# Now retrieve the result
-RESULT=$(osascript << 'EOF'
-tell application "Safari"
-    set jsCode to "window._textResult || window._textError || 'PENDING'"
-    set resultText to do JavaScript jsCode in current tab of front window
-    return resultText
-end tell
-EOF
-)
+for s in sessions:
+    # Convert 24h to 12h time
+    h, m = int(s['time'].split(':')[0]), s['time'].split(':')[1]
+    ampm = 'AM' if h < 12 else 'PM'
+    h = h if h <= 12 else h - 12
+    h = 12 if h == 0 else h
+    time_str = f'{h}:{m} {ampm}'
 
-if [ "$RESULT" = "PENDING" ] || [ "$RESULT" = "" ]; then
-    echo "No sessions with participants today or still loading"
+    names = '\n'.join([f'  - {name}' for name in s['bookings']])
+    msg += f\"{s['type']} @ {time_str}\n{names}\n\n\"
+
+print(msg.strip())
+")
+
+if [ -z "$MESSAGE" ]; then
+    echo "No sessions with participants today"
     exit 0
 fi
 
-if [[ "$RESULT" == *"Error"* ]] || [[ "$RESULT" == *"error"* ]]; then
-    echo "Error: $RESULT"
-    exit 1
-fi
+echo "Sending to: $PHONES"
+echo "Message:"
+echo "$MESSAGE"
+echo ""
 
-# Parse the result and send texts
-osascript << ENDSCRIPT
-set resultText to "$RESULT"
+# Send via iMessage
+IFS=',' read -ra PHONE_ARRAY <<< "$PHONES"
+SENT_COUNT=0
 
-if resultText is not "" then
-    set AppleScript's text item delimiters to "|||"
-    set resultParts to text items of resultText
-    set phoneNumbersStr to item 1 of resultParts
-    set msg to item 2 of resultParts
-    set AppleScript's text item delimiters to ""
-
-    -- Split phone numbers by comma
-    set AppleScript's text item delimiters to ","
-    set phoneNumbers to text items of phoneNumbersStr
-    set AppleScript's text item delimiters to ""
-
-    set sentCount to 0
-
-    tell application "Messages"
-        set targetService to 1st account whose service type = iMessage
-
-        repeat with phoneNumber in phoneNumbers
-            try
-                set targetBuddy to participant phoneNumber of targetService
-                send msg to targetBuddy
-                set sentCount to sentCount + 1
-                delay 1
-            on error errMsg
-                log "Failed to send to " & phoneNumber & ": " & errMsg
-            end try
-        end repeat
-    end tell
-
-    return "Sent daily text to " & sentCount & " recipient(s)"
-else
-    return "No sessions with participants today"
-end if
+for PHONE in "${PHONE_ARRAY[@]}"; do
+    osascript << ENDSCRIPT
+tell application "Messages"
+    set targetService to 1st account whose service type = iMessage
+    set targetBuddy to participant "$PHONE" of targetService
+    send "$MESSAGE" to targetBuddy
+end tell
 ENDSCRIPT
+    if [ $? -eq 0 ]; then
+        ((SENT_COUNT++))
+        echo "Sent to $PHONE"
+    else
+        echo "Failed to send to $PHONE"
+    fi
+    sleep 1
+done
+
+echo "Sent daily text to $SENT_COUNT recipient(s)"
