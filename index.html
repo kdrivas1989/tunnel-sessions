@@ -469,7 +469,7 @@
             const now = new Date();
             let availableSessions = sessions.filter(session => {
                 const sessionDate = new Date(session.date + 'T' + session.time);
-                return sessionDate > now && session.bookings.length < session.capacity;
+                return sessionDate > now;
             });
 
             // Filter by favorites if checkbox is checked
