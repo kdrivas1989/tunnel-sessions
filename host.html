@@ -1078,6 +1078,8 @@
             // Create sessions for each selected time and each week
             const startDate = new Date(selectedDate + 'T12:00:00');
             let sessionsCreated = 0;
+            let sessionsSkipped = 0;
+            let skippedDetails = [];
 
             for (let i = 0; i < repeatWeeks; i++) {
                 const sessionDate = new Date(startDate);
@@ -1092,11 +1094,24 @@
                         duration: duration,
                         capacity: capacity
                     });
-                    if (result) sessionsCreated++;
+                    if (result) {
+                        sessionsCreated++;
+                    } else {
+                        sessionsSkipped++;
+                        const displayDate = sessionDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        const hour = parseInt(time.split(':')[0]);
+                        const displayHour = hour > 12 ? hour - 12 : hour;
+                        const ampm = hour >= 12 ? 'PM' : 'AM';
+                        skippedDetails.push(`${displayDate} @ ${displayHour}:${time.split(':')[1]} ${ampm}`);
+                    }
                 });
             }
 
-            alert(`Created ${sessionsCreated} session(s)!`);
+            let message = `Created ${sessionsCreated} session(s)!`;
+            if (sessionsSkipped > 0) {
+                message += `\n\nSkipped ${sessionsSkipped} (already exist):\n- ${skippedDetails.join('\n- ')}`;
+            }
+            alert(message);
 
             // Keep the date but uncheck times
             document.querySelectorAll('input[name="sessionTime"]:checked').forEach(cb => cb.checked = false);
