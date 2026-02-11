@@ -322,6 +322,42 @@ section h2 {
     border-color: var(--primary-color);
 }
 
+/* Time Checkboxes */
+.time-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+    background: var(--bg-color);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.time-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.time-checkbox:hover {
+    border-color: var(--primary-color);
+}
+
+.time-checkbox input[type="checkbox"] {
+    accent-color: var(--primary-color);
+}
+
+.time-checkbox input[type="checkbox"]:checked + span {
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
 .btn-small {
     padding: 8px 16px;
     font-size: 0.875rem;

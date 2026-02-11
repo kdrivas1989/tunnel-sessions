@@ -94,16 +94,14 @@
                             <option value="Advanced Scrambles">Advanced Scrambles</option>
                         </select>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="sessionDate">Date</label>
-                            <input type="date" id="sessionDate" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="sessionTime">Time</label>
-                            <select id="sessionTime" required>
-                                <option value="">Select a date first</option>
-                            </select>
+                    <div class="form-group">
+                        <label for="sessionDate">Date</label>
+                        <input type="date" id="sessionDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Select Times (check all that apply)</label>
+                        <div id="sessionTimes" class="time-checkboxes">
+                            <p style="color: var(--text-secondary);">Select a date first</p>
                         </div>
                     </div>
                     <div class="form-row">
@@ -793,13 +791,13 @@
 
         function updateTimeOptions() {
             const dateInput = document.getElementById('sessionDate');
-            const timeSelect = document.getElementById('sessionTime');
+            const timesContainer = document.getElementById('sessionTimes');
             const dateValue = dateInput.value;
 
-            timeSelect.innerHTML = '';
+            timesContainer.innerHTML = '';
 
             if (!dateValue) {
-                timeSelect.innerHTML = '<option value="">Select a date first</option>';
+                timesContainer.innerHTML = '<p style="color: var(--text-secondary);">Select a date first</p>';
                 return;
             }
 
@@ -810,7 +808,7 @@
             // Check if it's a valid business day (Wed-Sun)
             // Monday = 1, Tuesday = 2 (closed)
             if (day === 1 || day === 2) {
-                timeSelect.innerHTML = '<option value="">Closed on Mon/Tue - pick another date</option>';
+                timesContainer.innerHTML = '<p style="color: var(--danger-color);">Closed on Mon/Tue - pick another date</p>';
                 return;
             }
 
@@ -830,7 +828,7 @@
                 endMin = 30;
             }
 
-            // Generate 30-minute increments
+            // Generate 30-minute increments as checkboxes
             let hour = startHour;
             let min = startMin;
 
@@ -840,10 +838,13 @@
                 const ampm = hour >= 12 ? 'PM' : 'AM';
                 const displayTime = `${displayHour}:${min.toString().padStart(2, '0')} ${ampm}`;
 
-                const option = document.createElement('option');
-                option.value = timeValue;
-                option.textContent = displayTime;
-                timeSelect.appendChild(option);
+                const label = document.createElement('label');
+                label.className = 'time-checkbox';
+                label.innerHTML = `
+                    <input type="checkbox" name="sessionTime" value="${timeValue}">
+                    <span>${displayTime}</span>
+                `;
+                timesContainer.appendChild(label);
 
                 // Add 30 minutes
                 min += 30;
@@ -1064,37 +1065,41 @@
 
             const sessionType = document.getElementById('sessionType').value;
             const selectedDate = document.getElementById('sessionDate').value;
-            const time = document.getElementById('sessionTime').value;
+            const selectedTimes = Array.from(document.querySelectorAll('input[name="sessionTime"]:checked')).map(cb => cb.value);
             const duration = parseInt(document.getElementById('sessionDuration').value);
             const capacity = parseInt(document.getElementById('sessionCapacity').value);
             const repeatWeeks = parseInt(document.getElementById('repeatWeeks').value);
 
-            if (!time || time.includes('Closed') || time.includes('Select')) {
-                alert('Please select a valid date and time');
+            if (selectedTimes.length === 0) {
+                alert('Please select at least one time');
                 return;
             }
 
-            // Create sessions for each week starting from selected date
+            // Create sessions for each selected time and each week
             const startDate = new Date(selectedDate + 'T12:00:00');
+            let sessionsCreated = 0;
 
             for (let i = 0; i < repeatWeeks; i++) {
                 const sessionDate = new Date(startDate);
                 sessionDate.setDate(startDate.getDate() + (i * 7));
-
                 const dateStr = sessionDate.toISOString().split('T')[0];
 
-                createSession({
-                    sessionType: sessionType,
-                    date: dateStr,
-                    time: time,
-                    duration: duration,
-                    capacity: capacity
+                selectedTimes.forEach(time => {
+                    const result = createSession({
+                        sessionType: sessionType,
+                        date: dateStr,
+                        time: time,
+                        duration: duration,
+                        capacity: capacity
+                    });
+                    if (result) sessionsCreated++;
                 });
             }
 
-            alert(`Created ${repeatWeeks} session(s)!`);
-            document.getElementById('create-session-form').reset();
-            document.getElementById('sessionTime').innerHTML = '<option value="">Select a date first</option>';
+            alert(`Created ${sessionsCreated} session(s)!`);
+
+            // Keep the date but uncheck times
+            document.querySelectorAll('input[name="sessionTime"]:checked').forEach(cb => cb.checked = false);
             document.getElementById('sessionDuration').value = '60';
             document.getElementById('sessionCapacity').value = '4';
             document.getElementById('repeatWeeks').value = '1';
