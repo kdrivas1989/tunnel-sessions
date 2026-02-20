@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Tunnel Sessions - Automatic Daily Text Script
-# Sends texts at 12pm to ALL configured phone numbers with all sessions for the day
-# Fetches data directly from Firebase REST API
+# Tunnel Sessions - Fetch today's session data from Firebase
+# Outputs phone numbers and formatted message for the sender app
+# Format: PHONES (comma-separated)\n===\nMESSAGE
 
 TODAY=$(date +%Y-%m-%d)
 
@@ -70,7 +70,6 @@ for doc in data.get('documents', []):
         })
 
 if not sessions:
-    print('')
     sys.exit(0)
 
 # Sort by time
@@ -99,34 +98,10 @@ print(msg.strip())
 ")
 
 if [ -z "$MESSAGE" ]; then
-    echo "No sessions with participants today"
     exit 0
 fi
 
-echo "Sending to: $PHONES"
-echo "Message:"
+# Output in parseable format
+echo "$PHONES"
+echo "==="
 echo "$MESSAGE"
-echo ""
-
-# Send via iMessage
-IFS=',' read -ra PHONE_ARRAY <<< "$PHONES"
-SENT_COUNT=0
-
-for PHONE in "${PHONE_ARRAY[@]}"; do
-    osascript << ENDSCRIPT
-tell application "Messages"
-    set targetService to 1st account whose service type = iMessage
-    set targetBuddy to participant "$PHONE" of targetService
-    send "$MESSAGE" to targetBuddy
-end tell
-ENDSCRIPT
-    if [ $? -eq 0 ]; then
-        ((SENT_COUNT++))
-        echo "Sent to $PHONE"
-    else
-        echo "Failed to send to $PHONE"
-    fi
-    sleep 1
-done
-
-echo "Sent daily text to $SENT_COUNT recipient(s)"

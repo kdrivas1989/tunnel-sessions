@@ -7,17 +7,17 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/bin/bash</string>
-        <string>/Users/kevindrivas/Desktop/projects/tunnel-sessions/scripts/send-daily-text.sh</string>
+        <string>/usr/bin/open</string>
+        <string>/Users/kevindrivas/Desktop/projects/tunnel-sessions/scripts/TunnelDailySync.app</string>
     </array>
 
-    <!-- Run at 12:00 PM every day -->
+    <!-- Run at 11:55 AM every day (sync + send takes ~1-2 min) -->
     <key>StartCalendarInterval</key>
     <dict>
         <key>Hour</key>
-        <integer>12</integer>
+        <integer>11</integer>
         <key>Minute</key>
-        <integer>0</integer>
+        <integer>55</integer>
     </dict>
 
     <key>RunAtLoad</key>
