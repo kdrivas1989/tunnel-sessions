@@ -18,7 +18,7 @@ from email.mime.text import MIMEText
 # Email-to-MMS gateways (support longer messages than SMS gateways)
 SMS_GATEWAYS = {
     "9784917053": "9784917053@vzwpix.com",      # Verizon MMS
-    "9788773600": "9788773600@tmomail.net",     # T-Mobile
+    "9788773600": "9788773600@tmomms.net",       # T-Mobile MMS
 }
 
 FIREBASE_SESSIONS_URL = (
