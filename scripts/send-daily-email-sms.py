@@ -17,7 +17,7 @@ from email.mime.text import MIMEText
 
 # Email-to-MMS gateways (support longer messages than SMS gateways)
 SMS_GATEWAYS = {
-    "9784917053": "9784917053@vtext.com",        # Verizon
+    "9784917053": "9784917053@vzwpix.com",      # Verizon MMS
     "9788773600": "9788773600@tmomms.net",       # T-Mobile MMS
 }
 
@@ -79,29 +79,29 @@ def get_todays_sessions():
     return today, sessions
 
 
-def format_time_short(time_24):
+def format_time(time_24):
     h, m = int(time_24.split(":")[0]), time_24.split(":")[1]
-    ampm = "PM" if h >= 12 else "AM"
+    ampm = "AM" if h < 12 else "PM"
     h = h if h <= 12 else h - 12
     h = 12 if h == 0 else h
-    if m == "00":
-        return f"{h}{ampm}"
-    return f"{h}:{m}{ampm}"
+    return f"{h}:{m} {ampm}"
 
 
 def format_message(today, sessions):
     dt = datetime.strptime(today, "%Y-%m-%d")
-    date_str = dt.strftime("%a %b %d").replace(" 0", " ")
+    date_str = dt.strftime("%A, %b %d").replace(" 0", " ")
+
+    msg = f"Tunnel Sessions - {date_str}\n"
+    msg += "================================\n\n"
 
     sessions.sort(key=lambda s: s["time"])
 
-    lines = [f"Shred Club - {date_str}"]
     for s in sessions:
-        time_str = format_time_short(s["time"])
-        names = ", ".join(s["bookings"])
-        lines.append(f"{time_str}: {names}")
+        time_str = format_time(s["time"])
+        names = "\n".join(f"  - {name}" for name in s["bookings"])
+        msg += f"{s['type']} @ {time_str}\n{names}\n\n"
 
-    return "\n".join(lines)
+    return msg.strip()
 
 
 def send_sms_via_email(gmail_addr, gmail_app_pw, gateway_addr, message):
