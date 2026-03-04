@@ -1,0 +1,19 @@
+name: Daily Text Notification
+
+on:
+  schedule:
+    # 11:55 AM EST (16:55 UTC) — note: 12:55 PM EDT during daylight saving
+    - cron: '55 16 * * *'
+  workflow_dispatch: # Allow manual trigger from GitHub Actions UI
+
+jobs:
+  send-text:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Send daily text via email-to-SMS
+        env:
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: python3 scripts/send-daily-email-sms.py
