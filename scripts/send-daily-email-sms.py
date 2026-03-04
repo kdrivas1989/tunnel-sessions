@@ -89,7 +89,7 @@ def format_time(time_24):
 
 def format_message(today, sessions):
     dt = datetime.strptime(today, "%Y-%m-%d")
-    date_str = dt.strftime("%A, %b %d").replace(" 0", " ")
+    date_str = dt.strftime("%B %d").replace(" 0", " ")
 
     msg = f"{date_str}\n\n"
 
