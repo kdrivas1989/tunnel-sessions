@@ -91,8 +91,7 @@ def format_message(today, sessions):
     dt = datetime.strptime(today, "%Y-%m-%d")
     date_str = dt.strftime("%A, %b %d").replace(" 0", " ")
 
-    msg = f"Tunnel Sessions - {date_str}\n"
-    msg += "================================\n\n"
+    msg = f"{date_str}\n\n"
 
     sessions.sort(key=lambda s: s["time"])
 
