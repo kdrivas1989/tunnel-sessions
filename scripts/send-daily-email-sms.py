@@ -79,26 +79,33 @@ def get_todays_sessions():
     return today, sessions
 
 
-def format_message(today, sessions):
+def format_time(time_24):
+    h, m = int(time_24.split(":")[0]), time_24.split(":")[1]
+    ampm = "AM" if h < 12 else "PM"
+    h = h if h <= 12 else h - 12
+    h = 12 if h == 0 else h
+    return f"{h}:{m} {ampm}"
+
+
+def format_messages(today, sessions):
+    """Return a list of short messages, one per session.
+
+    Email-to-SMS gateways truncate at ~160 chars, so we send
+    one message per session to avoid losing data.
+    """
     dt = datetime.strptime(today, "%Y-%m-%d")
     date_str = dt.strftime("%A, %b %d").replace(" 0", " ")
 
-    msg = f"Tunnel Sessions - {date_str}\n"
-    msg += "================================\n\n"
-
     sessions.sort(key=lambda s: s["time"])
 
+    messages = []
     for s in sessions:
-        h, m = int(s["time"].split(":")[0]), s["time"].split(":")[1]
-        ampm = "AM" if h < 12 else "PM"
-        h = h if h <= 12 else h - 12
-        h = 12 if h == 0 else h
-        time_str = f"{h}:{m} {ampm}"
+        time_str = format_time(s["time"])
+        names = ", ".join(s["bookings"])
+        msg = f"{s['type']} @ {time_str} - {date_str}\n{names}"
+        messages.append(msg)
 
-        names = "\n".join(f"  - {name}" for name in s["bookings"])
-        msg += f"{s['type']} @ {time_str}\n{names}\n\n"
-
-    return msg.strip()
+    return messages
 
 
 def send_sms_via_email(gmail_addr, gmail_app_pw, gateway_addr, message):
@@ -128,19 +135,23 @@ def main():
         print(f"No sessions with participants for {today}")
         sys.exit(0)
 
-    message = format_message(today, sessions)
-    print(f"Message for {today}:\n{message}\n")
+    messages = format_messages(today, sessions)
+    print(f"{len(messages)} session(s) for {today}:")
+    for m in messages:
+        print(f"  {m}\n")
 
     sent = 0
     for phone, gateway in SMS_GATEWAYS.items():
-        try:
-            send_sms_via_email(gmail_addr, gmail_app_pw, gateway, message)
-            print(f"Sent to {phone} via {gateway}")
-            sent += 1
-        except Exception as e:
-            print(f"Failed to send to {phone}: {e}")
+        for msg in messages:
+            try:
+                send_sms_via_email(gmail_addr, gmail_app_pw, gateway, msg)
+                sent += 1
+            except Exception as e:
+                print(f"Failed to send to {phone}: {e}")
+        print(f"Sent {len(messages)} message(s) to {phone}")
 
-    print(f"\nSent to {sent}/{len(SMS_GATEWAYS)} recipients")
+    total = len(SMS_GATEWAYS) * len(messages)
+    print(f"\nSent {sent}/{total} total messages")
     if sent == 0:
         sys.exit(1)
 
