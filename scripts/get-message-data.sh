@@ -2,7 +2,7 @@
 
 # Tunnel Sessions - Fetch today's session data from Firebase
 # Outputs phone numbers and formatted message for the sender app
-# Format: PHONES (comma-separated)\n===\nMESSAGE
+# Format: PHONES (comma-separated)\n---SPLIT---\nMESSAGE
 
 TODAY=$(date +%Y-%m-%d)
 
@@ -81,7 +81,7 @@ date_str = dt.strftime('%A, %b %d').replace(' 0', ' ')
 
 # Build message
 msg = f'Tunnel Sessions - {date_str}\n'
-msg += '================================\n\n'
+msg += '------------------------\n\n'
 
 for s in sessions:
     # Convert 24h to 12h time
@@ -103,5 +103,5 @@ fi
 
 # Output in parseable format
 echo "$PHONES"
-echo "==="
+echo "---SPLIT---"
 echo "$MESSAGE"

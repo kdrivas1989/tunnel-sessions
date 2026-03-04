@@ -337,7 +337,7 @@
         </footer>
     </div>
 
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=6"></script>
     <script>
         // Register service worker for PWA
         if ('serviceWorker' in navigator) {
@@ -362,6 +362,12 @@
             loadAvailableSessions();
             loadMyBookings();
             loadSecretarySection();
+
+            // Re-render when Firebase data updates
+            onDataChange(() => {
+                loadAvailableSessions();
+                loadMyBookings();
+            });
 
             // Set min date for secretary form
             const today = new Date().toISOString().split('T')[0];

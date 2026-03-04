@@ -14,9 +14,9 @@ if rawOutput is "" then
 	return
 end if
 
--- Split output on "===" separator
+-- Split output on "---SPLIT---" separator
 set oldDelims to AppleScript's text item delimiters
-set AppleScript's text item delimiters to "==="
+set AppleScript's text item delimiters to "---SPLIT---"
 set parts to text items of rawOutput
 set AppleScript's text item delimiters to oldDelims
 

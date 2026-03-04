@@ -1,19 +1,11 @@
 -- TunnelDailySync
--- Step 1: Syncs SignUpGenius participant data into Firebase
--- Step 2: Fetches today's session data from Firebase and sends via iMessage
--- Compiled as .app so macOS grants it Automation permissions for Safari and Messages
+-- Fetches today's session data from Firebase and sends via iMessage
+-- Bookings come directly from the website into Firebase (no SignUpGenius sync needed)
+-- Compiled as .app so macOS grants it Automation permissions for Messages
 
-set syncScript to "/Users/kevindrivas/Desktop/projects/tunnel-sessions/scripts/sync-signupgenius.sh"
 set messageScript to "/Users/kevindrivas/Desktop/projects/tunnel-sessions/scripts/get-message-data.sh"
 
--- Step 1: Sync SignUpGenius → Firebase
-try
-	do shell script syncScript
-on error errMsg
-	-- Log error but continue to send texts (Firebase may still have good data)
-end try
-
--- Step 2: Fetch message data and send via iMessage (same as TunnelTextSender)
+-- Fetch message data and send via iMessage
 try
 	set rawOutput to do shell script messageScript
 on error
@@ -24,9 +16,9 @@ if rawOutput is "" then
 	return
 end if
 
--- Split output on "===" separator
+-- Split output on "---SPLIT---" separator
 set oldDelims to AppleScript's text item delimiters
-set AppleScript's text item delimiters to "==="
+set AppleScript's text item delimiters to "---SPLIT---"
 set parts to text items of rawOutput
 set AppleScript's text item delimiters to oldDelims
 

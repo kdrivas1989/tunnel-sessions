@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tunnel-sessions-v1';
+const CACHE_NAME = 'tunnel-sessions-v2';
 const urlsToCache = [
   '/',
   '/index.html',
