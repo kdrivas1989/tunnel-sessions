@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Sessions: read by anyone, write with basic validation
+    match /sessions/{sessionId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['sessionType', 'date', 'time', 'duration', 'capacity', 'bookings'])
+                    && request.resource.data.sessionType is string
+                    && request.resource.data.date is string
+                    && request.resource.data.time is string
+                    && request.resource.data.duration is number
+                    && request.resource.data.capacity is number
+                    && request.resource.data.bookings is list;
+      allow update: if request.resource.data.keys().hasAll(['sessionType', 'date', 'time', 'duration', 'capacity', 'bookings']);
+      allow delete: if true;
+    }
+
+    // Hosts: read by anyone, write with basic validation
+    match /hosts/{hostId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['email'])
+                            && request.resource.data.email is string;
+      allow delete: if true;
+    }
+
+    // Users: read by anyone, write with basic validation
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['firstName', 'lastName', 'email'])
+                            && request.resource.data.firstName is string
+                            && request.resource.data.lastName is string
+                            && request.resource.data.email is string;
+      allow delete: if true;
+    }
+
+    // Settings: read by anyone, write allowed
+    match /settings/{docId} {
+      allow read, write: if true;
+    }
+  }
+}
