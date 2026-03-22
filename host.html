@@ -185,6 +185,11 @@
                         <textarea id="autoTextPhones" rows="3" placeholder="Enter phone numbers, one per line&#10;e.g.&#10;9784917053&#10;5551234567" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; font-family: inherit; resize: vertical;"></textarea>
                         <p class="field-hint">One number per line. Texts sent daily at 12pm with participant lists.</p>
                     </div>
+                    <div class="form-group">
+                        <label for="cancellationTextPhones">Phone Numbers for Cancellation Texts</label>
+                        <textarea id="cancellationTextPhones" rows="3" placeholder="Enter phone numbers, one per line&#10;e.g.&#10;9784917053&#10;5551234567" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; font-family: inherit; resize: vertical;"></textarea>
+                        <p class="field-hint">One number per line. Notified when someone cancels a booking.</p>
+                    </div>
                     <button type="submit" class="btn btn-primary">Save Settings</button>
                     <span id="settings-saved" class="success-message hidden" style="margin-left: 10px;">Saved!</span>
                 </form>
@@ -760,6 +765,12 @@
             } else {
                 document.getElementById('autoTextPhones').value = '9784917053';
             }
+
+            if (settings.cancellationTextPhones) {
+                document.getElementById('cancellationTextPhones').value = settings.cancellationTextPhones.join('\n');
+            } else {
+                document.getElementById('cancellationTextPhones').value = '';
+            }
         }
 
         function saveSettings() {
@@ -770,9 +781,16 @@
                 .map(p => p.replace(/\D/g, '').trim())
                 .filter(p => p.length >= 10);
 
+            const cancelPhonesText = document.getElementById('cancellationTextPhones').value;
+            const cancelPhones = cancelPhonesText
+                .split(/[\n,]+/)
+                .map(p => p.replace(/\D/g, '').trim())
+                .filter(p => p.length >= 10);
+
             const settings = {
                 autoTextPhones: phones,
-                autoTextPhone: phones[0] || '' // Keep for backwards compatibility
+                autoTextPhone: phones[0] || '', // Keep for backwards compatibility
+                cancellationTextPhones: cancelPhones
             };
             localStorage.setItem('tunnelSessionsSettings', JSON.stringify(settings));
         }

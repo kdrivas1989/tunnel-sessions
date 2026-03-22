@@ -785,7 +785,9 @@
         // Send cancellation text to host
         function sendCancellationText(session, booking, nextOnWaitlist = null) {
             const settings = JSON.parse(localStorage.getItem('tunnelSessionsSettings') || '{}');
-            const phones = settings.autoTextPhones || [settings.autoTextPhone || '9784917053'];
+            const phones = settings.cancellationTextPhones && settings.cancellationTextPhones.length > 0
+                ? settings.cancellationTextPhones
+                : settings.autoTextPhones || [settings.autoTextPhone || '9784917053'];
 
             const sessionDateTime = new Date(session.date + 'T' + session.time);
             const dateStr = sessionDateTime.toLocaleDateString('en-US', {
