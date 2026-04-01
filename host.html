@@ -181,9 +181,10 @@
                 <h2>Auto-Text Settings</h2>
                 <form id="settings-form">
                     <div class="form-group">
-                        <label for="autoTextPhones">Phone Numbers for Daily Texts</label>
-                        <textarea id="autoTextPhones" rows="3" placeholder="Enter phone numbers, one per line&#10;e.g.&#10;9784917053&#10;5551234567" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; font-family: inherit; resize: vertical;"></textarea>
-                        <p class="field-hint">One number per line. Texts sent daily at 12pm with participant lists.</p>
+                        <label>Phone Numbers for Daily Texts</label>
+                        <div id="autoTextPhonesList"></div>
+                        <button type="button" class="btn btn-small" onclick="addPhoneRow()" style="margin-top: 8px;">+ Add Number</button>
+                        <p class="field-hint">Texts sent daily at 12pm with participant lists. Carrier is needed for email-to-SMS delivery.</p>
                     </div>
                     <div class="form-group">
                         <label for="cancellationTextPhones">Phone Numbers for Cancellation Texts</label>
@@ -755,15 +756,60 @@
         }
 
         // Settings
-        function loadSettings() {
-            const settings = JSON.parse(localStorage.getItem('tunnelSessionsSettings') || '{}');
-            // Support both old single phone and new multiple phones format
-            if (settings.autoTextPhones) {
-                document.getElementById('autoTextPhones').value = settings.autoTextPhones.join('\n');
-            } else if (settings.autoTextPhone) {
-                document.getElementById('autoTextPhones').value = settings.autoTextPhone;
+        const CARRIERS = {
+            'verizon': 'Verizon',
+            'tmobile': 'T-Mobile',
+            'att': 'AT&T',
+            'sprint': 'Sprint',
+        };
+
+        function addPhoneRow(number = '', carrier = 'verizon') {
+            const list = document.getElementById('autoTextPhonesList');
+            const row = document.createElement('div');
+            row.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;';
+            row.innerHTML = `
+                <input type="tel" value="${number}" placeholder="9784917053" style="flex: 1; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem;">
+                <select style="padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; background: white;">
+                    ${Object.entries(CARRIERS).map(([k, v]) => `<option value="${k}" ${k === carrier ? 'selected' : ''}>${v}</option>`).join('')}
+                </select>
+                <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #e74c3c; font-size: 1.2rem; cursor: pointer; padding: 4px 8px;">&times;</button>
+            `;
+            list.appendChild(row);
+        }
+
+        function getPhoneRows() {
+            const rows = document.querySelectorAll('#autoTextPhonesList > div');
+            const phones = [];
+            rows.forEach(row => {
+                const number = row.querySelector('input').value.replace(/\D/g, '').trim();
+                const carrier = row.querySelector('select').value;
+                if (number.length >= 10) {
+                    phones.push({ number, carrier });
+                }
+            });
+            return phones;
+        }
+
+        async function loadSettings() {
+            // Load from Firebase first, fall back to localStorage
+            let settings = {};
+            try {
+                settings = await getSettingsAsync();
+            } catch (e) {
+                settings = JSON.parse(localStorage.getItem('tunnelSessionsSettings') || '{}');
+            }
+            window._cachedSettings = settings;
+
+            const list = document.getElementById('autoTextPhonesList');
+            list.innerHTML = '';
+
+            if (settings.autoTextPhonesWithCarrier && settings.autoTextPhonesWithCarrier.length > 0) {
+                settings.autoTextPhonesWithCarrier.forEach(p => addPhoneRow(p.number, p.carrier));
+            } else if (settings.autoTextPhones && settings.autoTextPhones.length > 0) {
+                // Migrate old format — default carrier to verizon
+                settings.autoTextPhones.forEach(p => addPhoneRow(p, 'verizon'));
             } else {
-                document.getElementById('autoTextPhones').value = '9784917053';
+                addPhoneRow('9784917053', 'verizon');
             }
 
             if (settings.cancellationTextPhones) {
@@ -773,13 +819,9 @@
             }
         }
 
-        function saveSettings() {
-            const phonesText = document.getElementById('autoTextPhones').value;
-            // Parse phone numbers: split by newlines/commas, clean each, filter empty
-            const phones = phonesText
-                .split(/[\n,]+/)
-                .map(p => p.replace(/\D/g, '').trim())
-                .filter(p => p.length >= 10);
+        async function saveSettings() {
+            const phonesWithCarrier = getPhoneRows();
+            const phones = phonesWithCarrier.map(p => p.number);
 
             const cancelPhonesText = document.getElementById('cancellationTextPhones').value;
             const cancelPhones = cancelPhonesText
@@ -788,16 +830,20 @@
                 .filter(p => p.length >= 10);
 
             const settings = {
+                autoTextPhonesWithCarrier: phonesWithCarrier,
                 autoTextPhones: phones,
-                autoTextPhone: phones[0] || '', // Keep for backwards compatibility
+                autoTextPhone: phones[0] || '',
                 cancellationTextPhones: cancelPhones
             };
+
+            // Save to both Firebase and localStorage
+            await saveSettingsAsync(settings);
             localStorage.setItem('tunnelSessionsSettings', JSON.stringify(settings));
         }
 
-        document.getElementById('settings-form').addEventListener('submit', (e) => {
+        document.getElementById('settings-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            saveSettings();
+            await saveSettings();
             document.getElementById('settings-saved').classList.remove('hidden');
             setTimeout(() => {
                 document.getElementById('settings-saved').classList.add('hidden');

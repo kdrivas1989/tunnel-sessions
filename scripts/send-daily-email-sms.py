@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Cloud-based daily text sender for Tunnel Sessions.
-Fetches today's sessions from Firebase, formats the message,
+Fetches today's sessions and phone list from Firebase, formats the message,
 and sends via Gmail SMTP to email-to-SMS gateways.
 
 Uses only Python stdlib — no pip dependencies needed.
@@ -15,21 +15,68 @@ import urllib.request
 from datetime import datetime, timezone, timedelta
 from email.mime.text import MIMEText
 
-# Email-to-MMS gateways (support longer messages than SMS gateways)
-SMS_GATEWAYS = {
-    "9784917053": "9784917053@vzwpix.com",      # Verizon MMS
-    "9788773600": "9788773600@tmomail.net",       # T-Mobile
+# Carrier → email-to-MMS gateway suffix
+CARRIER_GATEWAYS = {
+    "verizon": "vzwpix.com",
+    "tmobile": "tmomail.net",
+    "att": "mms.att.net",
+    "sprint": "pm.sprint.com",
 }
 
-FIREBASE_SESSIONS_URL = (
+FIREBASE_BASE_URL = (
     "https://firestore.googleapis.com/v1/projects/tunnel-sessions"
-    "/databases/(default)/documents/sessions"
+    "/databases/(default)/documents"
 )
+FIREBASE_SESSIONS_URL = f"{FIREBASE_BASE_URL}/sessions"
+FIREBASE_SETTINGS_URL = f"{FIREBASE_BASE_URL}/settings/app"
+
 
 def fetch_json(url):
     req = urllib.request.Request(url)
     with urllib.request.urlopen(req, timeout=15) as resp:
         return json.loads(resp.read().decode())
+
+
+def get_phone_list():
+    """Fetch phone numbers + carriers from Firebase settings."""
+    try:
+        data = fetch_json(FIREBASE_SETTINGS_URL)
+    except Exception as e:
+        print(f"Warning: Could not fetch settings from Firebase: {e}")
+        return []
+
+    fields = data.get("fields", {})
+
+    # New format: autoTextPhonesWithCarrier array of {number, carrier}
+    arr = (
+        fields.get("autoTextPhonesWithCarrier", {})
+        .get("arrayValue", {})
+        .get("values", [])
+    )
+    if arr:
+        phones = []
+        for item in arr:
+            mf = item.get("mapValue", {}).get("fields", {})
+            number = mf.get("number", {}).get("stringValue", "")
+            carrier = mf.get("carrier", {}).get("stringValue", "verizon")
+            if number:
+                phones.append({"number": number, "carrier": carrier})
+        return phones
+
+    # Fall back to old format: autoTextPhones array of strings
+    old_arr = (
+        fields.get("autoTextPhones", {})
+        .get("arrayValue", {})
+        .get("values", [])
+    )
+    if old_arr:
+        return [
+            {"number": v.get("stringValue", ""), "carrier": "verizon"}
+            for v in old_arr
+            if v.get("stringValue")
+        ]
+
+    return []
 
 
 def get_todays_sessions():
@@ -124,6 +171,14 @@ def main():
         print("ERROR: GMAIL_ADDRESS and GMAIL_APP_PASSWORD must be set")
         sys.exit(1)
 
+    # Fetch phone list from Firebase
+    phones = get_phone_list()
+    if not phones:
+        print("No phone numbers configured in Firebase settings")
+        sys.exit(0)
+
+    print(f"Recipients: {', '.join(p['number'] + ' (' + p['carrier'] + ')' for p in phones)}")
+
     today, sessions = get_todays_sessions()
 
     if not sessions:
@@ -134,15 +189,21 @@ def main():
     print(f"Message for {today}:\n{message}\n")
 
     sent = 0
-    for phone, gateway in SMS_GATEWAYS.items():
+    for phone in phones:
+        gateway_domain = CARRIER_GATEWAYS.get(phone["carrier"])
+        if not gateway_domain:
+            print(f"Unknown carrier '{phone['carrier']}' for {phone['number']}, skipping")
+            continue
+
+        gateway_addr = f"{phone['number']}@{gateway_domain}"
         try:
-            send_sms_via_email(gmail_addr, gmail_app_pw, gateway, message)
-            print(f"Sent to {phone} via {gateway}")
+            send_sms_via_email(gmail_addr, gmail_app_pw, gateway_addr, message)
+            print(f"Sent to {phone['number']} via {gateway_addr}")
             sent += 1
         except Exception as e:
-            print(f"Failed to send to {phone}: {e}")
+            print(f"Failed to send to {phone['number']}: {e}")
 
-    print(f"\nSent to {sent}/{len(SMS_GATEWAYS)} recipients")
+    print(f"\nSent to {sent}/{len(phones)} recipients")
     if sent == 0:
         sys.exit(1)
 
