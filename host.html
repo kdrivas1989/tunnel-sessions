@@ -768,8 +768,8 @@
             const row = document.createElement('div');
             row.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;';
             row.innerHTML = `
-                <input type="tel" value="${number}" placeholder="9784917053" style="flex: 1; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem;">
-                <select style="padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; background: white;">
+                <input type="tel" value="${number}" placeholder="9784917053" style="flex: 3; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem;">
+                <select style="flex: 1; min-width: 100px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; background: white;">
                     ${Object.entries(CARRIERS).map(([k, v]) => `<option value="${k}" ${k === carrier ? 'selected' : ''}>${v}</option>`).join('')}
                 </select>
                 <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #e74c3c; font-size: 1.2rem; cursor: pointer; padding: 4px 8px;">&times;</button>
