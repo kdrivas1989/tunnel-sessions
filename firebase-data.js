@@ -145,12 +145,18 @@ function getSettings() {
 
 async function saveSettingsAsync(settings) {
     try {
+        // Write and wait for server confirmation (not just local cache)
         await db.collection('settings').doc('app').set(settings, { merge: true });
-        window._cachedSettings = { ...window._cachedSettings, ...settings };
+        // Verify the write reached the server by reading back
+        const doc = await db.collection('settings').doc('app').get({ source: 'server' });
+        if (!doc.exists) {
+            throw new Error('Settings document not found after save');
+        }
+        window._cachedSettings = doc.data();
         return true;
     } catch (error) {
         console.error('Error saving settings:', error);
-        return false;
+        throw error;
     }
 }
 

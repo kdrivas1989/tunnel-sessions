@@ -323,7 +323,8 @@
         </footer>
     </div>
 
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=6"></script>
+    <script src="firebase-data.js?v=2"></script>
     <script>
         // Register service worker for PWA
         if ('serviceWorker' in navigator) {
@@ -843,11 +844,20 @@
 
         document.getElementById('settings-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            await saveSettings();
-            document.getElementById('settings-saved').classList.remove('hidden');
-            setTimeout(() => {
-                document.getElementById('settings-saved').classList.add('hidden');
-            }, 2000);
+            const savedEl = document.getElementById('settings-saved');
+            savedEl.classList.add('hidden');
+            try {
+                await saveSettings();
+                savedEl.textContent = 'Saved!';
+                savedEl.style.color = '';
+                savedEl.classList.remove('hidden');
+                setTimeout(() => savedEl.classList.add('hidden'), 2000);
+            } catch (err) {
+                console.error('Settings save failed:', err);
+                savedEl.textContent = 'Save failed — check connection and try again';
+                savedEl.style.color = 'red';
+                savedEl.classList.remove('hidden');
+            }
         });
 
         // Time picker based on date selection
