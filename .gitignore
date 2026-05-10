@@ -31,3 +31,7 @@ node_modules/
 # Build output
 dist/
 build/
+
+# Firestore exports (contain user PII and password hashes — never commit)
+export/
+export-firestore.mjs
