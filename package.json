@@ -1,0 +1,12 @@
+{
+  "name": "tunnel-sessions",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shred Club tunnel booking — static HTML/JS on GitHub Pages + Firebase Firestore + Firebase Auth",
+  "scripts": {
+    "set-claim": "node scripts/set-admin-claim.mjs"
+  },
+  "devDependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}

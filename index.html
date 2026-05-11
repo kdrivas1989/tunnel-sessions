@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="styles.css">
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
 </head>
@@ -338,6 +339,16 @@
     </div>
 
     <script src="app.js?v=6"></script>
+    <script src="auth-firebase.js?v=1"></script>
+    <script>
+        // Re-render UI when Firebase Auth state changes (login, logout, token refresh).
+        document.addEventListener('authstatechange', () => {
+            if (typeof updateUserBar === 'function') updateUserBar();
+            if (typeof loadAvailableSessions === 'function') loadAvailableSessions();
+            if (typeof loadMyBookings === 'function') loadMyBookings();
+            if (typeof loadSecretarySection === 'function') loadSecretarySection();
+        });
+    </script>
     <script>
         // Register service worker for PWA
         if ('serviceWorker' in navigator) {
@@ -1097,25 +1108,27 @@
             document.getElementById('login-error').classList.add('hidden');
         });
 
-        document.getElementById('login-form').addEventListener('submit', (e) => {
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('loginEmail').value.trim();
             const password = document.getElementById('loginPassword').value;
             const errorEl = document.getElementById('login-error');
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.disabled = true;
 
-            const user = verifyUser(email, password);
-
-            if (user) {
-                setUserLoggedIn(user);
-                document.getElementById('login-modal').classList.add('hidden');
-                document.getElementById('login-form').reset();
-                errorEl.classList.add('hidden');
-                updateUserBar();
-                loadAvailableSessions();
-                loadMyBookings();
-                loadSecretarySection();
-            } else {
-                errorEl.classList.remove('hidden');
+            try {
+                const user = await verifyUser(email, password);
+                if (user) {
+                    document.getElementById('login-modal').classList.add('hidden');
+                    document.getElementById('login-form').reset();
+                    errorEl.classList.add('hidden');
+                    // UI re-renders via the authstatechange listener
+                } else {
+                    errorEl.textContent = 'Invalid email or password';
+                    errorEl.classList.remove('hidden');
+                }
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
             }
         });
 
@@ -1131,34 +1144,35 @@
             document.getElementById('register-error').classList.add('hidden');
         });
 
-        document.getElementById('register-form').addEventListener('submit', (e) => {
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const firstName = document.getElementById('regFirstName').value.trim();
             const lastName = document.getElementById('regLastName').value.trim();
             const email = document.getElementById('regEmail').value.trim();
             const password = document.getElementById('regPassword').value;
             const errorEl = document.getElementById('register-error');
+            const submitBtn = e.target.querySelector('button[type="submit"]');
 
-            if (password.length < 6) {
-                errorEl.textContent = 'Password must be at least 6 characters';
+            if (password.length < 8) {
+                errorEl.textContent = 'Password must be at least 8 characters';
                 errorEl.classList.remove('hidden');
                 return;
             }
 
-            const result = createUser(firstName, lastName, email, password);
-
-            if (result.success) {
-                setUserLoggedIn(result.user);
-                document.getElementById('register-modal').classList.add('hidden');
-                document.getElementById('register-form').reset();
-                errorEl.classList.add('hidden');
-                updateUserBar();
-                loadAvailableSessions();
-                loadMyBookings();
-                loadSecretarySection();
-            } else {
-                errorEl.textContent = result.error;
-                errorEl.classList.remove('hidden');
+            if (submitBtn) submitBtn.disabled = true;
+            try {
+                const result = await createUser(firstName, lastName, email, password);
+                if (result.success) {
+                    document.getElementById('register-modal').classList.add('hidden');
+                    document.getElementById('register-form').reset();
+                    errorEl.classList.add('hidden');
+                    // UI re-renders via authstatechange listener
+                } else {
+                    errorEl.textContent = result.error;
+                    errorEl.classList.remove('hidden');
+                }
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
             }
         });
 
@@ -1182,12 +1196,9 @@
         }
 
         // User logout
-        function handleUserLogout() {
-            logoutUser();
-            updateUserBar();
-            loadAvailableSessions();
-            loadMyBookings();
-            loadSecretarySection();
+        async function handleUserLogout() {
+            await logoutUser();
+            // UI re-renders via authstatechange listener
         }
 
         // Track if we're doing multi-session booking
@@ -1486,46 +1497,30 @@
             document.getElementById('forgot-success').classList.add('hidden');
         });
 
-        document.getElementById('forgot-password-form').addEventListener('submit', (e) => {
+        document.getElementById('forgot-password-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('forgotEmail').value.trim();
             const errorEl = document.getElementById('forgot-error');
             const successEl = document.getElementById('forgot-success');
+            const submitBtn = e.target.querySelector('button[type="submit"]');
 
             errorEl.classList.add('hidden');
             successEl.classList.add('hidden');
+            if (submitBtn) submitBtn.disabled = true;
 
-            // Check if user exists
-            const user = getUserByEmail(email);
-            if (!user) {
-                errorEl.textContent = 'No account found with this email';
-                errorEl.classList.remove('hidden');
-                return;
+            try {
+                const result = await sendPasswordReset(email);
+                if (result.success) {
+                    successEl.textContent = 'If an account exists for that email, a password reset link has been sent. Check your inbox (and spam folder).';
+                    successEl.classList.remove('hidden');
+                    document.getElementById('forgot-password-form').reset();
+                } else {
+                    errorEl.textContent = result.error;
+                    errorEl.classList.remove('hidden');
+                }
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
             }
-
-            // Store reset request for admin to see
-            const resetRequests = JSON.parse(localStorage.getItem('tunnelSessionsResetRequests') || '[]');
-
-            // Check if already requested
-            const existingRequest = resetRequests.find(r => r.email.toLowerCase() === email.toLowerCase() && !r.processed);
-            if (existingRequest) {
-                successEl.textContent = 'Reset request already submitted. An admin will contact you soon.';
-                successEl.classList.remove('hidden');
-                return;
-            }
-
-            resetRequests.push({
-                id: Date.now().toString(36),
-                email: email.toLowerCase(),
-                userName: `${user.firstName} ${user.lastName}`,
-                requestedAt: new Date().toISOString(),
-                processed: false
-            });
-            localStorage.setItem('tunnelSessionsResetRequests', JSON.stringify(resetRequests));
-
-            successEl.textContent = 'Reset request submitted! An admin will reset your password and contact you.';
-            successEl.classList.remove('hidden');
-            document.getElementById('forgot-password-form').reset();
         });
 
         // Waitlist Modal
