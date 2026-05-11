@@ -1,43 +1,88 @@
 rules_version = '2';
 
+// Tunnel Sessions Firestore Rules
+//
+// Threat model: the Firebase Web API key is shipped to every browser, so anyone
+// can reach this service. Rules — not the key — must enforce who can do what.
+//
+// Identity tiers:
+//   - anonymous (no Firebase Auth user)
+//   - authenticated member (Firebase Auth user, no special claim)
+//   - secretary / admin (Firebase Auth user with custom claim role == "secretary" or "admin")
+//
+// Operational note: custom claims are set on the user with the Admin SDK
+// (see scripts/set-admin-claim.mjs). After granting a claim, the user must
+// sign out and back in (or call user.getIdToken(true)) for it to take effect.
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Sessions: read by anyone, write with basic validation
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return isSignedIn()
+        && (request.auth.token.role == 'admin' || request.auth.token.role == 'secretary');
+    }
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // For session updates by anonymous bookers: the only legal change is
+    // appending exactly one booking to the bookings array, capped at capacity.
+    function isLegalBookingAppend(prev, next) {
+      return next.diff(prev).affectedKeys().hasOnly(['bookings'])
+        && next.bookings is list
+        && next.bookings.size() == prev.bookings.size() + 1
+        && next.bookings.size() <= prev.capacity
+        && next.bookings[next.bookings.size() - 1].keys().hasOnly(['firstName', 'lastName', 'notes', 'bookedAt'])
+        && next.bookings[next.bookings.size() - 1].firstName is string
+        && next.bookings[next.bookings.size() - 1].lastName is string
+        && next.bookings[next.bookings.size() - 1].firstName.size() > 0
+        && next.bookings[next.bookings.size() - 1].firstName.size() < 100
+        && next.bookings[next.bookings.size() - 1].lastName.size() > 0
+        && next.bookings[next.bookings.size() - 1].lastName.size() < 100;
+    }
+
+    // ── Sessions ──────────────────────────────────────────────────────────────
+    // Public reads (everyone can see the schedule).
+    // Anonymous appends a booking, OR admin does anything.
     match /sessions/{sessionId} {
       allow read: if true;
-      allow create: if request.resource.data.keys().hasAll(['sessionType', 'date', 'time', 'duration', 'capacity', 'bookings'])
-                    && request.resource.data.sessionType is string
-                    && request.resource.data.date is string
-                    && request.resource.data.time is string
-                    && request.resource.data.duration is number
-                    && request.resource.data.capacity is number
-                    && request.resource.data.bookings is list;
-      allow update: if request.resource.data.keys().hasAll(['sessionType', 'date', 'time', 'duration', 'capacity', 'bookings']);
-      allow delete: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || isLegalBookingAppend(resource.data, request.resource.data);
     }
 
-    // Hosts: read by anyone, write with basic validation
+    // ── Hosts ─────────────────────────────────────────────────────────────────
+    // Public reads. Only admins write.
     match /hosts/{hostId} {
       allow read: if true;
-      allow create, update: if request.resource.data.keys().hasAll(['email'])
-                            && request.resource.data.email is string;
-      allow delete: if true;
+      allow create, update, delete: if isAdmin();
     }
 
-    // Users: read by anyone, write with basic validation
+    // ── Users ─────────────────────────────────────────────────────────────────
+    // Public reads (so the client can do "is this email already in the roster"
+    // checks during account-claim flow without leaking auth tokens).
+    // Admins manage the roster. A signed-in user may write to their own
+    // document — used for "claim my account" (linking firebaseUid to the
+    // existing legacy user record matched by email).
     match /users/{userId} {
       allow read: if true;
-      allow create, update: if request.resource.data.keys().hasAll(['firstName', 'lastName', 'email'])
-                            && request.resource.data.firstName is string
-                            && request.resource.data.lastName is string
-                            && request.resource.data.email is string;
-      allow delete: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (isSignedIn()
+            && resource.data.email.lower() == request.auth.token.email.lower()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['firebaseUid', 'claimedAt', 'lastLoginAt']));
     }
 
-    // Settings: read by anyone, write allowed
+    // ── Settings ──────────────────────────────────────────────────────────────
+    // Public reads (the app needs the global config). Admins only write.
     match /settings/{docId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }
