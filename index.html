@@ -1124,7 +1124,16 @@
                     errorEl.classList.add('hidden');
                     // UI re-renders via the authstatechange listener
                 } else {
-                    errorEl.textContent = 'Invalid email or password';
+                    // If they have a legacy /users record, tell them to claim it.
+                    let msg = 'Invalid email or password.';
+                    try {
+                        const snap = await firebase.firestore().collection('users').get();
+                        const has = snap.docs.some(d => (d.data().email || '').toLowerCase() === email.toLowerCase());
+                        if (has) {
+                            msg = 'We upgraded security. If this is your first sign-in, click "Sign up" below and use the same email to claim your account.';
+                        }
+                    } catch (_) { /* ignore lookup errors */ }
+                    errorEl.textContent = msg;
                     errorEl.classList.remove('hidden');
                 }
             } finally {
