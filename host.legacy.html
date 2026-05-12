@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tunnel Sessions - Host Dashboard</title>
+    <meta name="description" content="Manage your indoor skydiving sessions">
+    <meta name="theme-color" content="#6c63ff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tunnel Host">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="shredclub-logo.png">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="shredclub-logo.png" alt="Shred Club Logo" class="logo-png">
+            <h1>Host Dashboard</h1>
+            <p class="tagline">Manage Your Sessions</p>
+        </header>
+
+        <!-- Login Screen -->
+        <main id="login-screen" class="host-main">
+            <section class="card login-card">
+                <h2>Host Login</h2>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="loginUsername">Email</label>
+                        <input type="email" id="loginUsername" required autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" required autocomplete="current-password">
+                    </div>
+                    <p id="login-error" class="error-message hidden">Invalid email or password</p>
+                    <button type="submit" class="btn btn-primary btn-full">Login</button>
+                </form>
+            </section>
+        </main>
+
+        <!-- Setup Screen (First Time) -->
+        <main id="setup-screen" class="host-main hidden">
+            <section class="card login-card">
+                <h2>Create Admin Account</h2>
+                <p class="setup-intro">Set up your host login to manage sessions.</p>
+                <form id="setup-form">
+                    <div class="form-group">
+                        <label for="setupUsername">Email</label>
+                        <input type="email" id="setupUsername" required autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="setupPassword">Password</label>
+                        <input type="password" id="setupPassword" required minlength="6" autocomplete="new-password">
+                        <p class="field-hint">Minimum 6 characters</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="setupPasswordConfirm">Confirm Password</label>
+                        <input type="password" id="setupPasswordConfirm" required minlength="6" autocomplete="new-password">
+                    </div>
+                    <p id="setup-error" class="error-message hidden"></p>
+                    <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+                </form>
+            </section>
+        </main>
+
+        <!-- Dashboard (After Login) -->
+        <main id="dashboard-screen" class="host-main hidden">
+            <!-- Logout Bar -->
+            <div class="logout-bar">
+                <span id="welcome-user"></span>
+                <div class="logout-actions">
+                    <a href="index.html" class="btn btn-small btn-primary">View as User</a>
+                    <button class="btn btn-small btn-outline" onclick="openChangePasswordModal()">Change Password</button>
+                    <button class="btn btn-small btn-outline" onclick="handleLogout()">Logout</button>
+                </div>
+            </div>
+
+            <!-- Create Session Section -->
+            <section class="card">
+                <h2>Create New Session</h2>
+                <form id="create-session-form">
+                    <div class="form-group">
+                        <label for="sessionType">Session Type</label>
+                        <select id="sessionType" required>
+                            <option value="">Select a session type</option>
+                            <option value="ShredClub">ShredClub</option>
+                            <option value="Rookie Scrambles">Rookie Scrambles</option>
+                            <option value="Advanced Scrambles">Advanced Scrambles</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="sessionDate">Date</label>
+                        <input type="date" id="sessionDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Select Times (check all that apply)</label>
+                        <div id="sessionTimes" class="time-checkboxes">
+                            <p style="color: var(--text-secondary);">Select a date first</p>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="sessionDuration">Duration (minutes)</label>
+                            <input type="number" id="sessionDuration" value="60" min="15" max="180" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="sessionCapacity">Capacity (people)</label>
+                            <input type="number" id="sessionCapacity" value="4" min="1" max="20" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="repeatWeeks">Repeat for X weeks</label>
+                            <input type="number" id="repeatWeeks" value="1" min="1" max="52" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create Session(s)</button>
+                </form>
+            </section>
+
+            <!-- Manage Sessions Section -->
+            <section class="card">
+                <div class="section-header">
+                    <h2>Manage Sessions</h2>
+                    <button class="btn btn-small btn-outline" onclick="exportSessionsToCSV()">Export CSV</button>
+                </div>
+                <div id="host-month-filter" class="month-filter"></div>
+                <div id="host-sessions-list" class="host-sessions"></div>
+                <div id="no-host-sessions" class="message hidden">
+                    <p>No sessions created yet. Create your first session above!</p>
+                </div>
+            </section>
+
+            <!-- Analytics Section -->
+            <section class="card">
+                <h2>Analytics</h2>
+                <div id="analytics-dashboard" class="analytics-grid">
+                    <div class="stat-card">
+                        <span class="stat-value" id="stat-total-sessions">0</span>
+                        <span class="stat-label">Total Sessions</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="stat-total-bookings">0</span>
+                        <span class="stat-label">Total Bookings</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="stat-upcoming-sessions">0</span>
+                        <span class="stat-label">Upcoming Sessions</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="stat-fill-rate">0%</span>
+                        <span class="stat-label">Avg Fill Rate</span>
+                    </div>
+                </div>
+                <div class="analytics-details" style="margin-top: 20px;">
+                    <div class="analytics-row">
+                        <div class="analytics-column">
+                            <h4>Popular Session Types</h4>
+                            <div id="popular-types"></div>
+                        </div>
+                        <div class="analytics-column">
+                            <h4>Popular Times</h4>
+                            <div id="popular-times"></div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px;">
+                        <h4>Frequent Flyers</h4>
+                        <div id="frequent-flyers"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Section -->
+            <section class="card">
+                <h2>Auto-Text Settings</h2>
+                <form id="settings-form">
+                    <div class="form-group">
+                        <label>Phone Numbers for Daily Texts</label>
+                        <div id="autoTextPhonesList"></div>
+                        <button type="button" class="btn btn-small" onclick="addPhoneRow()" style="margin-top: 8px;">+ Add Number</button>
+                        <p class="field-hint">Texts sent daily at 12pm with participant lists. Carrier is needed for email-to-SMS delivery.</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="cancellationTextPhones">Phone Numbers for Cancellation Texts</label>
+                        <textarea id="cancellationTextPhones" rows="3" placeholder="Enter phone numbers, one per line&#10;e.g.&#10;9784917053&#10;5551234567" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; font-family: inherit; resize: vertical;"></textarea>
+                        <p class="field-hint">One number per line. Notified when someone cancels a booking.</p>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                    <span id="settings-saved" class="success-message hidden" style="margin-left: 10px;">Saved!</span>
+                </form>
+            </section>
+
+            <!-- Host Management Section (Admin Only) -->
+            <section id="host-management" class="card hidden">
+                <h2>Manage Hosts (Admin Only)</h2>
+                <form id="create-host-form" style="margin-bottom: 20px;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="newHostEmail">Host Email</label>
+                            <input type="email" id="newHostEmail" required placeholder="host@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="newHostPassword">Password</label>
+                            <input type="password" id="newHostPassword" required minlength="6" placeholder="Min 6 characters">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Host</button>
+                    <span id="host-created" class="success-message hidden" style="margin-left: 10px;">Host created!</span>
+                    <span id="host-error" class="error-message hidden" style="margin-left: 10px;"></span>
+                </form>
+                <div id="hosts-list"></div>
+            </section>
+
+            <!-- Host Management Section (Admin Only) -->
+            <section id="host-management" class="card hidden">
+                <h2>Manage Hosts</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">Hosts can manage sessions and bookings.</p>
+                <div id="hosts-list"></div>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                    <h4 style="margin-bottom: 10px;">Add New Host</h4>
+                    <form id="add-host-form" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+                        <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0;">
+                            <label for="addHostEmail">Email</label>
+                            <input type="email" id="addHostEmail" placeholder="email@example.com" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add Host</button>
+                    </form>
+                    <p class="field-hint" style="margin-top: 5px;">Default password: 123456</p>
+                </div>
+            </section>
+
+            <!-- User Management Section (Admin Only) -->
+            <section id="user-management" class="card hidden">
+                <h2>Manage Users (Admin Only)</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">All registered users who can book sessions.</p>
+                <div id="users-list"></div>
+            </section>
+
+            <!-- Password Reset Requests (Admin Only) -->
+            <section id="reset-requests" class="card hidden">
+                <h2>Password Reset Requests</h2>
+                <div id="reset-requests-list"></div>
+            </section>
+
+            <!-- Add Person Modal -->
+            <div id="add-person-modal" class="modal hidden">
+                <div class="modal-content">
+                    <span class="close-btn">&times;</span>
+                    <h3>Add Person to Session</h3>
+                    <div id="add-session-details"></div>
+                    <form id="add-person-form">
+                        <div class="form-group">
+                            <label for="addFirstName">First Name</label>
+                            <input type="text" id="addFirstName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="addLastName">Last Name</label>
+                            <input type="text" id="addLastName" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add Person</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Change Password Modal -->
+            <div id="change-password-modal" class="modal hidden">
+                <div class="modal-content">
+                    <span class="close-btn">&times;</span>
+                    <h3>Change Password</h3>
+                    <form id="change-password-form">
+                        <div class="form-group">
+                            <label for="currentPassword">Current Password</label>
+                            <input type="password" id="currentPassword" required autocomplete="current-password">
+                        </div>
+                        <div class="form-group">
+                            <label for="newPassword">New Password</label>
+                            <input type="password" id="newPassword" required minlength="6" autocomplete="new-password">
+                        </div>
+                        <div class="form-group">
+                            <label for="confirmNewPassword">Confirm New Password</label>
+                            <input type="password" id="confirmNewPassword" required minlength="6" autocomplete="new-password">
+                        </div>
+                        <p id="change-password-error" class="error-message hidden"></p>
+                        <p id="change-password-success" class="success-message hidden">Password changed successfully!</p>
+                        <button type="submit" class="btn btn-primary btn-full">Update Password</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Edit Session Modal -->
+            <div id="edit-session-modal" class="modal hidden">
+                <div class="modal-content">
+                    <span class="close-btn">&times;</span>
+                    <h3>Edit Session</h3>
+                    <div id="edit-session-details"></div>
+                    <form id="edit-session-form">
+                        <div class="form-group">
+                            <label for="editSessionType">Session Type</label>
+                            <select id="editSessionType" required>
+                                <option value="ShredClub">ShredClub</option>
+                                <option value="Rookie Scrambles">Rookie Scrambles</option>
+                                <option value="Advanced Scrambles">Advanced Scrambles</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Participants</label>
+                            <div id="edit-participants-list"></div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-full">Save Changes</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <a href="index.html" class="host-link">Back to Booking Page</a>
+        </footer>
+    </div>
+
+    <script src="app.js?v=6"></script>
+    <script src="firebase-data.js?v=2"></script>
+    <script>
+        // Register service worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then((registration) => {
+                        console.log('ServiceWorker registered:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('ServiceWorker registration failed:', error);
+                    });
+            });
+        }
+
+        // Screen management
+        const loginScreen = document.getElementById('login-screen');
+        const setupScreen = document.getElementById('setup-screen');
+        const dashboardScreen = document.getElementById('dashboard-screen');
+
+        function showScreen(screen) {
+            loginScreen.classList.add('hidden');
+            setupScreen.classList.add('hidden');
+            dashboardScreen.classList.add('hidden');
+            screen.classList.remove('hidden');
+        }
+
+        // Initialize - check auth state
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!adminExists()) {
+                // First time - show setup
+                showScreen(setupScreen);
+            } else if (isLoggedIn()) {
+                // Already logged in
+                showDashboard();
+            } else {
+                // Show login
+                showScreen(loginScreen);
+            }
+        });
+
+        // Setup form
+        document.getElementById('setup-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = document.getElementById('setupUsername').value.trim();
+            const password = document.getElementById('setupPassword').value;
+            const confirmPassword = document.getElementById('setupPasswordConfirm').value;
+            const errorEl = document.getElementById('setup-error');
+
+            errorEl.classList.add('hidden');
+
+            if (!username || username.length < 3) {
+                errorEl.textContent = 'Username must be at least 3 characters';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                errorEl.textContent = 'Passwords do not match';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            if (password.length < 6) {
+                errorEl.textContent = 'Password must be at least 6 characters';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                createAdmin(username, password);
+                setLoggedIn();
+                showDashboard();
+            } catch (err) {
+                errorEl.textContent = 'Error creating account: ' + err.message;
+                errorEl.classList.remove('hidden');
+                console.error('Setup error:', err);
+            }
+        });
+
+        // Login form - accepts host OR admin
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const errorEl = document.getElementById('login-error');
+
+            // Try host login first
+            let valid = false;
+            const host = verifyHost(email, password);
+            if (host) {
+                valid = true;
+                localStorage.setItem('hostRole', 'host');
+            }
+
+            // If not host, try admin login
+            if (!valid) {
+                const isAdmin = verifyAdmin(email, password);
+                if (isAdmin) {
+                    valid = true;
+                    localStorage.setItem('hostRole', 'admin');
+                }
+            }
+
+            if (valid) {
+                errorEl.classList.add('hidden');
+                setLoggedIn();
+                showDashboard();
+            } else {
+                errorEl.classList.remove('hidden');
+            }
+        });
+
+        // Logout
+        function handleLogout() {
+            logout();
+            localStorage.removeItem('hostRole');
+            showScreen(loginScreen);
+            document.getElementById('login-form').reset();
+        }
+
+        // Show dashboard
+        function showDashboard() {
+            const role = localStorage.getItem('hostRole') || 'host';
+            const admin = getAdmin();
+
+            if (role === 'admin' && admin) {
+                document.getElementById('welcome-user').textContent = `Welcome, ${admin.username} (Admin)`;
+                document.getElementById('host-management').classList.remove('hidden');
+                document.getElementById('user-management').classList.remove('hidden');
+                document.getElementById('reset-requests').classList.remove('hidden');
+                loadHosts();
+                loadUsers();
+                loadResetRequests();
+            } else {
+                document.getElementById('welcome-user').textContent = `Welcome, Host`;
+                document.getElementById('host-management').classList.add('hidden');
+                document.getElementById('user-management').classList.add('hidden');
+                document.getElementById('reset-requests').classList.add('hidden');
+            }
+
+            showScreen(dashboardScreen);
+            loadHostSessions();
+            loadSettings();
+
+            // Set minimum date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('sessionDate').min = today;
+        }
+
+        // Load and display hosts (admin only)
+        function loadHosts() {
+            const hosts = getHosts();
+            const container = document.getElementById('hosts-list');
+
+            if (hosts.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary);">No hosts created yet.</p>';
+                return;
+            }
+
+            let html = '<ul class="bookings-list">';
+            hosts.forEach(host => {
+                html += `
+                    <li>
+                        <span>${host.email}</span>
+                        <button class="btn-remove" onclick="removeHost('${host.id}')">Remove</button>
+                    </li>
+                `;
+            });
+            html += '</ul>';
+            container.innerHTML = html;
+        }
+
+        // Remove host
+        function removeHost(hostId) {
+            if (confirm('Are you sure you want to remove this host?')) {
+                deleteHost(hostId);
+                loadHosts();
+            }
+        }
+
+        // Add host form (simple version with default password)
+        document.getElementById('add-host-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('addHostEmail').value.trim();
+            const defaultPassword = '123456';
+
+            const result = createHost(email, defaultPassword);
+
+            if (result.success) {
+                alert('Host added successfully! Default password: 123456');
+                document.getElementById('add-host-form').reset();
+                loadHosts();
+            } else {
+                alert('Error: ' + result.error);
+            }
+        });
+
+        // Create host form (if exists)
+        const createHostForm = document.getElementById('create-host-form');
+        if (createHostForm) createHostForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('newHostEmail').value.trim();
+            const password = document.getElementById('newHostPassword').value;
+            const successEl = document.getElementById('host-created');
+            const errorEl = document.getElementById('host-error');
+
+            successEl.classList.add('hidden');
+            errorEl.classList.add('hidden');
+
+            if (password.length < 6) {
+                errorEl.textContent = 'Password must be at least 6 characters';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            const result = createHost(email, password);
+
+            if (result.success) {
+                successEl.classList.remove('hidden');
+                document.getElementById('create-host-form').reset();
+                loadHosts();
+                setTimeout(() => successEl.classList.add('hidden'), 2000);
+            } else {
+                errorEl.textContent = result.error;
+                errorEl.classList.remove('hidden');
+            }
+        });
+
+        // Load and display users (admin only)
+        function loadUsers() {
+            const users = getUsers();
+            const hosts = getHosts();
+            const container = document.getElementById('users-list');
+
+            if (users.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary);">No users registered yet.</p>';
+                return;
+            }
+
+            let html = '<ul class="bookings-list">';
+            users.forEach(user => {
+                const hasSecretary = user.permissions && user.permissions.includes('secretary');
+                const isHost = hosts.some(h => h.email.toLowerCase() === user.email.toLowerCase());
+
+                let badges = '';
+                if (isHost) {
+                    badges += '<span style="background: var(--success-color); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; margin-left: 8px;">Host</span>';
+                }
+                if (hasSecretary) {
+                    badges += '<span style="background: var(--secondary-color); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; margin-left: 8px;">Secretary</span>';
+                }
+
+                const makeHostBtn = !isHost
+                    ? `<button class="btn btn-small btn-text" onclick="makeUserHost('${user.email}')">Make Host</button>`
+                    : '';
+
+                html += `
+                    <li style="flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <strong>${user.firstName} ${user.lastName}</strong>${badges}<br>
+                            <span style="color: var(--text-secondary); font-size: 0.9rem;">${user.email}</span>
+                        </div>
+                        <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                            ${makeHostBtn}
+                            <button class="btn btn-small ${hasSecretary ? 'btn-danger' : 'btn-primary'}" onclick="toggleSecretaryPermission('${user.id}')">
+                                ${hasSecretary ? 'Remove Secretary' : 'Make Secretary'}
+                            </button>
+                            <button class="btn btn-small btn-edit" onclick="resetUserPassword('${user.id}')">Reset Password</button>
+                            <button class="btn-remove" onclick="removeUser('${user.id}')">Remove</button>
+                        </div>
+                    </li>
+                `;
+            });
+            html += '</ul>';
+            container.innerHTML = html;
+        }
+
+        // Make user a host
+        function makeUserHost(email) {
+            const result = createHost(email, '123456');
+            if (result.success) {
+                alert('User is now a host! Default password: 123456');
+                loadHosts();
+                loadUsers();
+            } else {
+                alert('Error: ' + result.error);
+            }
+        }
+
+        // Toggle secretary permission
+        function toggleSecretaryPermission(userId) {
+            const users = getUsers();
+            const user = users.find(u => u.id === userId);
+            if (!user) return;
+
+            const currentPerms = user.permissions || [];
+            const hasSecretary = currentPerms.includes('secretary');
+
+            if (hasSecretary) {
+                updateUserPermissions(userId, currentPerms.filter(p => p !== 'secretary'));
+            } else {
+                updateUserPermissions(userId, [...currentPerms, 'secretary']);
+            }
+
+            loadUsers();
+        }
+
+        // Reset user password
+        function resetUserPassword(userId) {
+            const newPassword = prompt('Enter new password for this user (min 6 characters):');
+            if (!newPassword) return;
+
+            if (newPassword.length < 6) {
+                alert('Password must be at least 6 characters');
+                return;
+            }
+
+            const users = getUsers();
+            const userIndex = users.findIndex(u => u.id === userId);
+            if (userIndex === -1) {
+                alert('User not found');
+                return;
+            }
+
+            users[userIndex].passwordHash = hashPassword(newPassword);
+            saveUsers(users);
+            alert('Password reset successfully');
+        }
+
+        // Remove user
+        function removeUser(userId) {
+            if (!confirm('Are you sure you want to remove this user?')) return;
+
+            const users = getUsers();
+            const filtered = users.filter(u => u.id !== userId);
+            saveUsers(filtered);
+            loadUsers();
+        }
+
+        // Load password reset requests
+        function loadResetRequests() {
+            const requests = JSON.parse(localStorage.getItem('tunnelSessionsResetRequests') || '[]');
+            const pendingRequests = requests.filter(r => !r.processed);
+            const container = document.getElementById('reset-requests-list');
+
+            if (pendingRequests.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary);">No pending password reset requests.</p>';
+                return;
+            }
+
+            let html = '<ul class="bookings-list">';
+            pendingRequests.forEach(request => {
+                const requestDate = new Date(request.requestedAt).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit'
+                });
+                html += `
+                    <li style="flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <strong>${request.userName}</strong><br>
+                            <span style="color: var(--text-secondary); font-size: 0.9rem;">${request.email}</span><br>
+                            <span style="color: var(--text-secondary); font-size: 0.8rem;">Requested: ${requestDate}</span>
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <button class="btn btn-small btn-primary" onclick="processResetRequest('${request.id}')">Reset Password</button>
+                            <button class="btn-remove" onclick="dismissResetRequest('${request.id}')">Dismiss</button>
+                        </div>
+                    </li>
+                `;
+            });
+            html += '</ul>';
+            container.innerHTML = html;
+        }
+
+        // Process reset request - reset the user's password
+        function processResetRequest(requestId) {
+            const requests = JSON.parse(localStorage.getItem('tunnelSessionsResetRequests') || '[]');
+            const request = requests.find(r => r.id === requestId);
+
+            if (!request) {
+                alert('Request not found');
+                return;
+            }
+
+            const newPassword = prompt(`Enter new password for ${request.userName} (${request.email}):`);
+            if (!newPassword) return;
+
+            if (newPassword.length < 6) {
+                alert('Password must be at least 6 characters');
+                return;
+            }
+
+            // Find and update user
+            const users = getUsers();
+            const userIndex = users.findIndex(u => u.email.toLowerCase() === request.email.toLowerCase());
+
+            if (userIndex === -1) {
+                alert('User not found');
+                return;
+            }
+
+            users[userIndex].passwordHash = hashPassword(newPassword);
+            saveUsers(users);
+
+            // Mark request as processed
+            request.processed = true;
+            request.processedAt = new Date().toISOString();
+            localStorage.setItem('tunnelSessionsResetRequests', JSON.stringify(requests));
+
+            alert(`Password reset for ${request.userName}. Please inform them their new password is: ${newPassword}`);
+            loadResetRequests();
+        }
+
+        // Dismiss reset request
+        function dismissResetRequest(requestId) {
+            if (!confirm('Dismiss this reset request?')) return;
+
+            const requests = JSON.parse(localStorage.getItem('tunnelSessionsResetRequests') || '[]');
+            const request = requests.find(r => r.id === requestId);
+
+            if (request) {
+                request.processed = true;
+                request.dismissed = true;
+                localStorage.setItem('tunnelSessionsResetRequests', JSON.stringify(requests));
+            }
+
+            loadResetRequests();
+        }
+
+        // Settings
+        const CARRIERS = {
+            'verizon': 'Verizon',
+            'tmobile': 'T-Mobile',
+            'att': 'AT&T',
+            'sprint': 'Sprint',
+        };
+
+        function addPhoneRow(number = '', carrier = 'verizon') {
+            const list = document.getElementById('autoTextPhonesList');
+            const row = document.createElement('div');
+            row.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;';
+            row.innerHTML = `
+                <input type="tel" value="${number}" placeholder="9784917053" style="flex: 3; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem;">
+                <select style="flex: 1; min-width: 100px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; background: white;">
+                    ${Object.entries(CARRIERS).map(([k, v]) => `<option value="${k}" ${k === carrier ? 'selected' : ''}>${v}</option>`).join('')}
+                </select>
+                <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #e74c3c; font-size: 1.2rem; cursor: pointer; padding: 4px 8px;">&times;</button>
+            `;
+            list.appendChild(row);
+        }
+
+        function getPhoneRows() {
+            const rows = document.querySelectorAll('#autoTextPhonesList > div');
+            const phones = [];
+            rows.forEach(row => {
+                const number = row.querySelector('input').value.replace(/\D/g, '').trim();
+                const carrier = row.querySelector('select').value;
+                if (number.length >= 10) {
+                    phones.push({ number, carrier });
+                }
+            });
+            return phones;
+        }
+
+        async function loadSettings() {
+            // Load from Firebase first, fall back to localStorage
+            let settings = {};
+            try {
+                settings = await getSettingsAsync();
+            } catch (e) {
+                settings = JSON.parse(localStorage.getItem('tunnelSessionsSettings') || '{}');
+            }
+            window._cachedSettings = settings;
+
+            const list = document.getElementById('autoTextPhonesList');
+            list.innerHTML = '';
+
+            if (settings.autoTextPhonesWithCarrier && settings.autoTextPhonesWithCarrier.length > 0) {
+                settings.autoTextPhonesWithCarrier.forEach(p => addPhoneRow(p.number, p.carrier));
+            } else if (settings.autoTextPhones && settings.autoTextPhones.length > 0) {
+                // Migrate old format — default carrier to verizon
+                settings.autoTextPhones.forEach(p => addPhoneRow(p, 'verizon'));
+            } else {
+                addPhoneRow('9784917053', 'verizon');
+            }
+
+            if (settings.cancellationTextPhones) {
+                document.getElementById('cancellationTextPhones').value = settings.cancellationTextPhones.join('\n');
+            } else {
+                document.getElementById('cancellationTextPhones').value = '';
+            }
+        }
+
+        async function saveSettings() {
+            const phonesWithCarrier = getPhoneRows();
+            const phones = phonesWithCarrier.map(p => p.number);
+
+            const cancelPhonesText = document.getElementById('cancellationTextPhones').value;
+            const cancelPhones = cancelPhonesText
+                .split(/[\n,]+/)
+                .map(p => p.replace(/\D/g, '').trim())
+                .filter(p => p.length >= 10);
+
+            const settings = {
+                autoTextPhonesWithCarrier: phonesWithCarrier,
+                autoTextPhones: phones,
+                autoTextPhone: phones[0] || '',
+                cancellationTextPhones: cancelPhones
+            };
+
+            // Save to both Firebase and localStorage
+            await saveSettingsAsync(settings);
+            localStorage.setItem('tunnelSessionsSettings', JSON.stringify(settings));
+        }
+
+        document.getElementById('settings-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const savedEl = document.getElementById('settings-saved');
+            savedEl.classList.add('hidden');
+            try {
+                await saveSettings();
+                savedEl.textContent = 'Saved!';
+                savedEl.style.color = '';
+                savedEl.classList.remove('hidden');
+                setTimeout(() => savedEl.classList.add('hidden'), 2000);
+            } catch (err) {
+                console.error('Settings save failed:', err);
+                savedEl.textContent = 'Save failed — check connection and try again';
+                savedEl.style.color = 'red';
+                savedEl.classList.remove('hidden');
+            }
+        });
+
+        // Time picker based on date selection
+        document.getElementById('sessionDate').addEventListener('change', updateTimeOptions);
+
+        function updateTimeOptions() {
+            const dateInput = document.getElementById('sessionDate');
+            const timesContainer = document.getElementById('sessionTimes');
+            const dateValue = dateInput.value;
+
+            timesContainer.innerHTML = '';
+
+            if (!dateValue) {
+                timesContainer.innerHTML = '<p style="color: var(--text-secondary);">Select a date first</p>';
+                return;
+            }
+
+            // Get day of week from selected date (0 = Sunday, 1 = Monday, etc.)
+            const selectedDate = new Date(dateValue + 'T12:00:00');
+            const day = selectedDate.getDay();
+
+            // Check if it's a valid business day (Wed-Sun)
+            // Monday = 1, Tuesday = 2 (closed)
+            if (day === 1 || day === 2) {
+                timesContainer.innerHTML = '<p style="color: var(--danger-color);">Closed on Mon/Tue - pick another date</p>';
+                return;
+            }
+
+            let startHour, startMin, endHour, endMin;
+
+            // Wednesday (3), Thursday (4), Friday (5): 2:00 PM - 9:00 PM
+            // Saturday (6), Sunday (0): 10:00 AM - 5:30 PM
+            if (day === 3 || day === 4 || day === 5) {
+                startHour = 14; // 2:00 PM
+                startMin = 0;
+                endHour = 21;   // 9:00 PM
+                endMin = 0;
+            } else {
+                startHour = 10; // 10:00 AM
+                startMin = 0;
+                endHour = 17;   // 5:30 PM
+                endMin = 30;
+            }
+
+            // Generate 30-minute increments as checkboxes
+            let hour = startHour;
+            let min = startMin;
+
+            while (hour < endHour || (hour === endHour && min <= endMin)) {
+                const timeValue = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
+                const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                const displayTime = `${displayHour}:${min.toString().padStart(2, '0')} ${ampm}`;
+
+                const label = document.createElement('label');
+                label.className = 'time-checkbox';
+                label.innerHTML = `
+                    <input type="checkbox" name="sessionTime" value="${timeValue}">
+                    <span>${displayTime}</span>
+                `;
+                timesContainer.appendChild(label);
+
+                // Add 30 minutes
+                min += 30;
+                if (min >= 60) {
+                    min = 0;
+                    hour++;
+                }
+            }
+        }
+
+        // Track selected month filter for host page
+        let hostSelectedMonth = 'all';
+
+        function setHostMonthFilter(month) {
+            hostSelectedMonth = month;
+            document.querySelectorAll('#host-month-filter .month-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.month === month);
+            });
+            loadHostSessions();
+        }
+
+        function loadHostSessions() {
+            const sessions = getSessions();
+            const container = document.getElementById('host-sessions-list');
+            const noSessionsMsg = document.getElementById('no-host-sessions');
+            const monthFilterContainer = document.getElementById('host-month-filter');
+            const now = new Date();
+
+            container.innerHTML = '';
+
+            // Filter out past sessions
+            let futureSessions = sessions.filter(s => {
+                const sessionDate = new Date(s.date + 'T' + s.time);
+                return sessionDate >= now;
+            });
+
+            // Generate month filter buttons
+            const months = {};
+            futureSessions.forEach(session => {
+                const date = new Date(session.date);
+                const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                months[monthKey] = monthName;
+            });
+
+            let monthButtonsHtml = `<button class="btn month-btn ${hostSelectedMonth === 'all' ? 'active' : ''}" data-month="all" onclick="setHostMonthFilter('all')">All</button>`;
+            Object.keys(months).sort().forEach(monthKey => {
+                monthButtonsHtml += `<button class="btn month-btn ${hostSelectedMonth === monthKey ? 'active' : ''}" data-month="${monthKey}" onclick="setHostMonthFilter('${monthKey}')">${months[monthKey]}</button>`;
+            });
+            monthFilterContainer.innerHTML = monthButtonsHtml;
+
+            // Filter by selected month
+            if (hostSelectedMonth !== 'all') {
+                futureSessions = futureSessions.filter(session => {
+                    const date = new Date(session.date);
+                    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                    return monthKey === hostSelectedMonth;
+                });
+            }
+
+            if (futureSessions.length === 0) {
+                noSessionsMsg.classList.remove('hidden');
+                container.classList.add('hidden');
+                return;
+            }
+
+            noSessionsMsg.classList.add('hidden');
+            container.classList.remove('hidden');
+
+            // Sort by date
+            futureSessions.sort((a, b) => {
+                const dateA = new Date(a.date + 'T' + a.time);
+                const dateB = new Date(b.date + 'T' + b.time);
+                return dateA - dateB;
+            });
+
+            futureSessions.forEach(session => {
+                const card = createHostSessionCard(session);
+                container.appendChild(card);
+            });
+
+            // Update analytics after loading sessions
+            updateAnalytics();
+        }
+
+        function updateAnalytics() {
+            const sessions = getSessions();
+            const now = new Date();
+
+            // Basic stats
+            const totalSessions = sessions.length;
+            const totalBookings = sessions.reduce((sum, s) => sum + s.bookings.length, 0);
+            const upcomingSessions = sessions.filter(s => new Date(s.date + 'T' + s.time) > now).length;
+
+            // Calculate average fill rate for sessions with bookings
+            let fillRate = 0;
+            if (sessions.length > 0) {
+                const totalFill = sessions.reduce((sum, s) => sum + (s.bookings.length / s.capacity), 0);
+                fillRate = Math.round((totalFill / sessions.length) * 100);
+            }
+
+            // Update stat cards
+            document.getElementById('stat-total-sessions').textContent = totalSessions;
+            document.getElementById('stat-total-bookings').textContent = totalBookings;
+            document.getElementById('stat-upcoming-sessions').textContent = upcomingSessions;
+            document.getElementById('stat-fill-rate').textContent = fillRate + '%';
+
+            // Popular session types
+            const typeCounts = {};
+            sessions.forEach(s => {
+                typeCounts[s.sessionType] = (typeCounts[s.sessionType] || 0) + s.bookings.length;
+            });
+            const sortedTypes = Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+            const typesHtml = sortedTypes.length > 0
+                ? '<ul>' + sortedTypes.map(([type, count]) => `<li><span>${type}</span><span>${count} bookings</span></li>`).join('') + '</ul>'
+                : '<p style="color: var(--text-secondary);">No data yet</p>';
+            document.getElementById('popular-types').innerHTML = typesHtml;
+
+            // Popular times
+            const timeCounts = {};
+            sessions.forEach(s => {
+                const hour = parseInt(s.time.split(':')[0]);
+                const timeLabel = hour < 12 ? `${hour}:00 AM` : hour === 12 ? '12:00 PM' : `${hour - 12}:00 PM`;
+                timeCounts[timeLabel] = (timeCounts[timeLabel] || 0) + s.bookings.length;
+            });
+            const sortedTimes = Object.entries(timeCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+            const timesHtml = sortedTimes.length > 0
+                ? '<ul>' + sortedTimes.map(([time, count]) => `<li><span>${time}</span><span>${count} bookings</span></li>`).join('') + '</ul>'
+                : '<p style="color: var(--text-secondary);">No data yet</p>';
+            document.getElementById('popular-times').innerHTML = timesHtml;
+
+            // Frequent flyers
+            const flyerCounts = {};
+            sessions.forEach(s => {
+                s.bookings.forEach(b => {
+                    const name = `${b.firstName} ${b.lastName}`;
+                    flyerCounts[name] = (flyerCounts[name] || 0) + 1;
+                });
+            });
+            const sortedFlyers = Object.entries(flyerCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+            const flyersHtml = sortedFlyers.length > 0
+                ? '<ul>' + sortedFlyers.map(([name, count]) => `<li><span>${name}</span><span>${count} sessions</span></li>`).join('') + '</ul>'
+                : '<p style="color: var(--text-secondary);">No bookings yet</p>';
+            document.getElementById('frequent-flyers').innerHTML = flyersHtml;
+        }
+
+        function createHostSessionCard(session) {
+            const card = document.createElement('div');
+            card.className = 'host-session-card';
+
+            const date = new Date(session.date + 'T' + session.time);
+            const now = new Date();
+            const isPast = date < now;
+
+            if (isPast) {
+                card.classList.add('past');
+            }
+
+            const dateStr = date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+            const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const badgeClass = getSessionTypeClass(session.sessionType);
+
+            let bookingsHtml = '';
+            if (session.bookings.length > 0) {
+                bookingsHtml = '<ul class="bookings-list">';
+                session.bookings.forEach((booking, index) => {
+                    const notesHtml = booking.notes ? `<div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">${booking.notes}</div>` : '';
+                    bookingsHtml += `
+                        <li>
+                            <div style="flex: 1;">
+                                <span>${booking.firstName} ${booking.lastName}</span>
+                                ${notesHtml}
+                            </div>
+                            <button class="btn-remove" onclick="removeBooking('${session.id}', ${index})" title="Remove">&#10005;</button>
+                        </li>
+                    `;
+                });
+                bookingsHtml += '</ul>';
+            } else {
+                bookingsHtml = '<p class="no-bookings">No bookings yet</p>';
+            }
+
+            // Waitlist section
+            let waitlistHtml = '';
+            const waitlist = session.waitlist || [];
+            if (waitlist.length > 0) {
+                waitlistHtml = `
+                    <div class="waitlist-container" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                        <h4 style="color: #f59e0b;">Waitlist (${waitlist.length}):</h4>
+                        <ul class="bookings-list">
+                            ${waitlist.map((person, index) => `
+                                <li>
+                                    <div style="flex: 1;">
+                                        <span>${person.firstName} ${person.lastName}</span>
+                                        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">${person.email}</div>
+                                    </div>
+                                    <div style="display: flex; gap: 5px;">
+                                        ${session.bookings.length < session.capacity ? `<button class="btn btn-small btn-join" onclick="promoteFromWaitlist('${session.id}', '${person.email}')" title="Add to session">Promote</button>` : ''}
+                                        <button class="btn-remove" onclick="removeFromWaitlistHost('${session.id}', '${person.email}')" title="Remove from waitlist">&#10005;</button>
+                                    </div>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            const hasBookings = session.bookings.length > 0;
+            const textBtn = hasBookings && !isPast ? `<button class="btn btn-small btn-text" onclick="textParticipants('${session.id}')">Text List</button>` : '';
+            const editBtn = !isPast ? `<button class="btn btn-small btn-edit" onclick="openEditSessionModal('${session.id}')">Edit</button>` : '';
+
+            card.innerHTML = `
+                <div class="host-session-header">
+                    <div>
+                        <span class="session-type-badge ${badgeClass}">${session.sessionType || 'Session'}</span>
+                        <h3>${dateStr}</h3>
+                        <p>${timeStr} - ${session.duration} min | ${session.bookings.length}/${session.capacity} booked</p>
+                    </div>
+                    <div class="session-actions">
+                        ${editBtn}
+                        ${textBtn}
+                        ${!isPast ? `<button class="btn btn-small" onclick="openAddPersonModal('${session.id}')">Add Person</button>` : ''}
+                        <button class="btn btn-small btn-danger" onclick="deleteSession('${session.id}')">Delete</button>
+                    </div>
+                </div>
+                <div class="bookings-container">
+                    <h4>Bookings:</h4>
+                    ${bookingsHtml}
+                </div>
+                ${waitlistHtml}
+            `;
+
+            return card;
+        }
+
+        // Create Session Form
+        document.getElementById('create-session-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const sessionType = document.getElementById('sessionType').value;
+            const selectedDate = document.getElementById('sessionDate').value;
+            const selectedTimes = Array.from(document.querySelectorAll('input[name="sessionTime"]:checked')).map(cb => cb.value);
+            const duration = parseInt(document.getElementById('sessionDuration').value);
+            const capacity = parseInt(document.getElementById('sessionCapacity').value);
+            const repeatWeeks = parseInt(document.getElementById('repeatWeeks').value);
+
+            if (selectedTimes.length === 0) {
+                alert('Please select at least one time');
+                return;
+            }
+
+            // Create sessions for each selected time and each week
+            const startDate = new Date(selectedDate + 'T12:00:00');
+            let sessionsCreated = 0;
+            let sessionsSkipped = 0;
+            let skippedDetails = [];
+
+            for (let i = 0; i < repeatWeeks; i++) {
+                const sessionDate = new Date(startDate);
+                sessionDate.setDate(startDate.getDate() + (i * 7));
+                const dateStr = sessionDate.toISOString().split('T')[0];
+
+                selectedTimes.forEach(time => {
+                    const result = createSession({
+                        sessionType: sessionType,
+                        date: dateStr,
+                        time: time,
+                        duration: duration,
+                        capacity: capacity
+                    });
+                    if (result) {
+                        sessionsCreated++;
+                    } else {
+                        sessionsSkipped++;
+                        const displayDate = sessionDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        const hour = parseInt(time.split(':')[0]);
+                        const displayHour = hour > 12 ? hour - 12 : hour;
+                        const ampm = hour >= 12 ? 'PM' : 'AM';
+                        skippedDetails.push(`${displayDate} @ ${displayHour}:${time.split(':')[1]} ${ampm}`);
+                    }
+                });
+            }
+
+            let message = `Created ${sessionsCreated} session(s)!`;
+            if (sessionsSkipped > 0) {
+                message += `\n\nSkipped ${sessionsSkipped} (already exist):\n- ${skippedDetails.join('\n- ')}`;
+            }
+            alert(message);
+
+            // Keep the date but uncheck times
+            document.querySelectorAll('input[name="sessionTime"]:checked').forEach(cb => cb.checked = false);
+            document.getElementById('sessionDuration').value = '60';
+            document.getElementById('sessionCapacity').value = '4';
+            document.getElementById('repeatWeeks').value = '1';
+            loadHostSessions();
+        });
+
+        // Add Person Modal
+        let selectedHostSessionId = null;
+
+        function openAddPersonModal(sessionId) {
+            selectedHostSessionId = sessionId;
+            const session = getSessionById(sessionId);
+
+            if (!session) return;
+
+            if (session.bookings.length >= session.capacity) {
+                alert('This session is already full!');
+                return;
+            }
+
+            const date = new Date(session.date + 'T' + session.time);
+            const dateStr = date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric'
+            });
+            const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const badgeClass = getSessionTypeClass(session.sessionType);
+
+            document.getElementById('add-session-details').innerHTML = `
+                <p class="session-type-badge ${badgeClass}">${session.sessionType || 'Session'}</p>
+                <p><strong>${dateStr}</strong></p>
+                <p>${timeStr} - ${session.bookings.length}/${session.capacity} booked</p>
+            `;
+
+            document.getElementById('add-person-modal').classList.remove('hidden');
+            document.getElementById('addFirstName').focus();
+        }
+
+        document.querySelector('#add-person-modal .close-btn').addEventListener('click', () => {
+            document.getElementById('add-person-modal').classList.add('hidden');
+            document.getElementById('add-person-form').reset();
+        });
+
+        document.getElementById('add-person-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const firstName = document.getElementById('addFirstName').value.trim();
+            const lastName = document.getElementById('addLastName').value.trim();
+
+            if (!firstName || !lastName) {
+                alert('Please enter first and last name');
+                return;
+            }
+
+            const result = addBooking(selectedHostSessionId, firstName, lastName);
+
+            if (result.success) {
+                document.getElementById('add-person-modal').classList.add('hidden');
+                document.getElementById('add-person-form').reset();
+                loadHostSessions();
+            } else {
+                alert('Could not add person. Session may be full.');
+            }
+        });
+
+        function removeBooking(sessionId, bookingIndex) {
+            if (confirm('Remove this person from the session?')) {
+                // Check if there's someone on the waitlist to notify
+                const session = getSessionById(sessionId);
+                const nextOnWaitlist = session && session.waitlist && session.waitlist.length > 0 ? session.waitlist[0] : null;
+
+                removeBookingFromSession(sessionId, bookingIndex);
+                loadHostSessions();
+
+                // Notify about waitlist if someone is waiting
+                if (nextOnWaitlist) {
+                    const sessionDateTime = new Date(session.date + 'T' + session.time);
+                    const dateStr = sessionDateTime.toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                    const timeStr = sessionDateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+                    alert(`A spot has opened up!\n\nNext on waitlist: ${nextOnWaitlist.firstName} ${nextOnWaitlist.lastName}\nEmail: ${nextOnWaitlist.email}\n\nYou can promote them to the session or contact them directly.`);
+                }
+            }
+        }
+
+        // Remove someone from waitlist (host action)
+        function removeFromWaitlistHost(sessionId, email) {
+            if (confirm('Remove this person from the waitlist?')) {
+                removeFromWaitlist(sessionId, email);
+                loadHostSessions();
+            }
+        }
+
+        // Promote someone from waitlist to session
+        function promoteFromWaitlist(sessionId, email) {
+            const session = getSessionById(sessionId);
+            if (!session) return;
+
+            const waitlistPerson = session.waitlist.find(w => w.email.toLowerCase() === email.toLowerCase());
+            if (!waitlistPerson) {
+                alert('Person not found on waitlist');
+                return;
+            }
+
+            // Check if there's space
+            if (session.bookings.length >= session.capacity) {
+                alert('Session is full. Cannot promote from waitlist.');
+                return;
+            }
+
+            if (confirm(`Add ${waitlistPerson.firstName} ${waitlistPerson.lastName} to the session?`)) {
+                // Add to session
+                const result = addBooking(sessionId, waitlistPerson.firstName, waitlistPerson.lastName);
+                if (result.success) {
+                    // Remove from waitlist
+                    removeFromWaitlist(sessionId, email);
+                    loadHostSessions();
+
+                    // Prompt to notify the person
+                    const sessionDateTime = new Date(session.date + 'T' + session.time);
+                    const dateStr = sessionDateTime.toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                    const timeStr = sessionDateTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+                    const message = `Great news! A spot opened up and you've been added to ${session.sessionType} on ${dateStr} at ${timeStr}. See you there!`;
+
+                    if (confirm(`${waitlistPerson.firstName} has been added!\n\nWould you like to send them a notification email?`)) {
+                        const mailtoLink = `mailto:${waitlistPerson.email}?subject=${encodeURIComponent('You\'ve been added to the session!')}&body=${encodeURIComponent(message)}`;
+                        window.open(mailtoLink, '_blank');
+                    }
+                } else {
+                    alert('Could not add to session. It may be full.');
+                }
+            }
+        }
+
+        function deleteSession(sessionId) {
+            const session = getSessionById(sessionId);
+            if (session && session.bookings.length > 0) {
+                if (!confirm('This session has bookings. Are you sure you want to delete it?')) {
+                    return;
+                }
+            } else if (!confirm('Delete this session?')) {
+                return;
+            }
+
+            deleteSessionById(sessionId);
+            loadHostSessions();
+        }
+
+        // Export sessions to CSV
+        function exportSessionsToCSV() {
+            const sessions = getSessions();
+            const now = new Date();
+
+            // Filter to future sessions and sort by date
+            const futureSessions = sessions
+                .filter(s => new Date(s.date + 'T' + s.time) > now)
+                .sort((a, b) => new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time));
+
+            if (futureSessions.length === 0) {
+                alert('No upcoming sessions to export.');
+                return;
+            }
+
+            // Build CSV content
+            const headers = ['Date', 'Time', 'Session Type', 'Duration', 'Capacity', 'Booked', 'Participant', 'Notes'];
+            let csvContent = headers.join(',') + '\n';
+
+            futureSessions.forEach(session => {
+                const sessionDate = new Date(session.date + 'T' + session.time);
+                const dateStr = sessionDate.toLocaleDateString('en-US');
+                const timeStr = sessionDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+                if (session.bookings.length === 0) {
+                    // Empty session - one row
+                    csvContent += `"${dateStr}","${timeStr}","${session.sessionType}",${session.duration},${session.capacity},0,"",""\n`;
+                } else {
+                    // One row per participant
+                    session.bookings.forEach((booking, index) => {
+                        const name = `${booking.firstName} ${booking.lastName}`;
+                        const notes = (booking.notes || '').replace(/"/g, '""');
+                        if (index === 0) {
+                            csvContent += `"${dateStr}","${timeStr}","${session.sessionType}",${session.duration},${session.capacity},${session.bookings.length},"${name}","${notes}"\n`;
+                        } else {
+                            csvContent += `"","","","","","","${name}","${notes}"\n`;
+                        }
+                    });
+                }
+            });
+
+            // Download file
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `tunnel-sessions-${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+
+        // Edit Session Modal
+        let editingSessionId = null;
+
+        function openEditSessionModal(sessionId) {
+            editingSessionId = sessionId;
+            const session = getSessionById(sessionId);
+
+            if (!session) return;
+
+            const date = new Date(session.date + 'T' + session.time);
+            const dateStr = date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric'
+            });
+            const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+            document.getElementById('edit-session-details').innerHTML = `
+                <p><strong>${dateStr}</strong></p>
+                <p>${timeStr} - ${session.bookings.length} participant(s)</p>
+            `;
+
+            // Build editable participants list
+            let participantsHtml = '';
+            if (session.bookings.length > 0) {
+                session.bookings.forEach((booking, index) => {
+                    participantsHtml += `
+                        <div class="edit-participant-row" style="margin-bottom: 12px;">
+                            <div style="display: flex; gap: 8px; margin-bottom: 4px;">
+                                <input type="text" class="edit-first-name" data-index="${index}" value="${booking.firstName || ''}" placeholder="First" style="flex: 1; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px;">
+                                <input type="text" class="edit-last-name" data-index="${index}" value="${booking.lastName || ''}" placeholder="Last" style="flex: 1; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px;">
+                            </div>
+                            <input type="text" class="edit-notes" data-index="${index}" value="${booking.notes || ''}" placeholder="Notes" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.9rem; color: var(--text-secondary);">
+                        </div>
+                    `;
+                });
+            } else {
+                participantsHtml = '<p style="color: var(--text-secondary);">No participants</p>';
+            }
+            document.getElementById('edit-participants-list').innerHTML = participantsHtml;
+
+            document.getElementById('editSessionType').value = session.sessionType || 'ShredClub';
+            document.getElementById('edit-session-modal').classList.remove('hidden');
+        }
+
+        document.querySelector('#edit-session-modal .close-btn').addEventListener('click', () => {
+            document.getElementById('edit-session-modal').classList.add('hidden');
+        });
+
+        document.getElementById('edit-session-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const newSessionType = document.getElementById('editSessionType').value;
+
+            if (editingSessionId && newSessionType) {
+                // Get the session to update bookings
+                const session = getSessionById(editingSessionId);
+                if (session && session.bookings.length > 0) {
+                    // Update each booking with edited values
+                    const firstNames = document.querySelectorAll('.edit-first-name');
+                    const lastNames = document.querySelectorAll('.edit-last-name');
+                    const notes = document.querySelectorAll('.edit-notes');
+
+                    firstNames.forEach((input, index) => {
+                        if (session.bookings[index]) {
+                            session.bookings[index].firstName = input.value.trim();
+                            session.bookings[index].lastName = lastNames[index].value.trim();
+                            session.bookings[index].notes = notes[index].value.trim();
+                        }
+                    });
+
+                    // Save the updated bookings
+                    updateSession(editingSessionId, { sessionType: newSessionType, bookings: session.bookings });
+                } else {
+                    updateSession(editingSessionId, { sessionType: newSessionType });
+                }
+
+                document.getElementById('edit-session-modal').classList.add('hidden');
+                loadHostSessions();
+            }
+        });
+
+        // Text participants list
+        function textParticipants(sessionId) {
+            const session = getSessionById(sessionId);
+            if (!session || session.bookings.length === 0) {
+                alert('No participants to text');
+                return;
+            }
+
+            const date = new Date(session.date + 'T' + session.time);
+            const dateStr = date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'short',
+                day: 'numeric'
+            });
+            const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+            // Build participant list
+            const names = session.bookings.map(b => `${b.firstName} ${b.lastName}`).join(', ');
+
+            // Build message
+            const message = `${session.sessionType} - ${dateStr} at ${timeStr}\n\nParticipants:\n${session.bookings.map(b => `- ${b.firstName} ${b.lastName}`).join('\n')}`;
+
+            // Phone number
+            const phoneNumber = '9784917053';
+
+            // Open SMS
+            const smsUrl = `sms:${phoneNumber}&body=${encodeURIComponent(message)}`;
+            window.open(smsUrl, '_self');
+        }
+
+        // Close modal on outside click
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.classList.add('hidden');
+                document.getElementById('add-person-form').reset();
+                document.getElementById('change-password-form').reset();
+                document.getElementById('change-password-error').classList.add('hidden');
+                document.getElementById('change-password-success').classList.add('hidden');
+            }
+        });
+
+        // Change Password Modal
+        function openChangePasswordModal() {
+            document.getElementById('change-password-modal').classList.remove('hidden');
+            document.getElementById('currentPassword').focus();
+        }
+
+        document.querySelector('#change-password-modal .close-btn').addEventListener('click', () => {
+            document.getElementById('change-password-modal').classList.add('hidden');
+            document.getElementById('change-password-form').reset();
+            document.getElementById('change-password-error').classList.add('hidden');
+            document.getElementById('change-password-success').classList.add('hidden');
+        });
+
+        document.getElementById('change-password-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+            const errorEl = document.getElementById('change-password-error');
+            const successEl = document.getElementById('change-password-success');
+
+            errorEl.classList.add('hidden');
+            successEl.classList.add('hidden');
+
+            if (newPassword !== confirmNewPassword) {
+                errorEl.textContent = 'New passwords do not match';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            if (newPassword.length < 6) {
+                errorEl.textContent = 'New password must be at least 6 characters';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            const success = changePassword(currentPassword, newPassword);
+
+            if (success) {
+                successEl.classList.remove('hidden');
+                document.getElementById('change-password-form').reset();
+                setTimeout(() => {
+                    document.getElementById('change-password-modal').classList.add('hidden');
+                    successEl.classList.add('hidden');
+                }, 1500);
+            } else {
+                errorEl.textContent = 'Current password is incorrect';
+                errorEl.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
