@@ -30,7 +30,25 @@
         const PHONE_NUMBER = '9784917053';
 
         document.addEventListener('DOMContentLoaded', () => {
-            checkTodaysSessions();
+            const statusEl = document.getElementById('status');
+            statusEl.innerHTML = '<p class="message">Loading...</p>';
+
+            // Wait for Firebase snapshot before rendering — localStorage cache may be stale
+            let rendered = false;
+            onDataChange(() => {
+                if (!rendered) {
+                    rendered = true;
+                    checkTodaysSessions();
+                }
+            });
+
+            // Fallback: if Firebase never fires (offline/no config), use cache after 3s
+            setTimeout(() => {
+                if (!rendered) {
+                    rendered = true;
+                    checkTodaysSessions();
+                }
+            }, 3000);
         });
 
         function checkTodaysSessions() {
